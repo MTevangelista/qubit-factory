@@ -10,9 +10,28 @@ Você (a sessão que recebeu `/factory`) é o **orquestrador**. Você spawna os 
 Regras gerais:
 
 - Estado vive em arquivos em `factory/jobs/<job-id>/`, nunca na conversa. Passe aos agentes **caminhos**, não resumos.
-- Raiz do repo = `$REPO`. Worktree do job = `../qubit-factory-factory/<job-id>` (`$WT`). Nunca trabalhe na raiz do repo, exceto para o merge final.
-- Leia `factory/config.sh` (limites e comandos) e `factory/lessons.md` antes de começar.
+- Raiz do repo = `$REPO`. Pasta do job = `$REPO/factory/jobs/<job-id>` (`$JOB`). Worktree do job = `../qubit-factory-factory/<job-id>` (`$WT`). Nunca trabalhe na raiz do repo, exceto para o merge final.
+- Leia `factory/config.sh` (limites e comandos) antes de começar. `lessons.md` é para os agentes; você não precisa lê-lo.
 - Responda ao usuário em português.
+
+## Antes de começar: modelo da sessão
+Você, orquestrador, roda no modelo **da sessão**, não num modelo fixo. O seu trabalho é disparar agentes, ler primeiras linhas e atualizar `job.json`: isso não precisa de Opus 5.5. Medição real de um fluxo equivalente (geração anterior de modelos): US$ 2,65 com orquestrador em Haiku contra US$ 43,68 em Opus.
+Se a sessão estiver em Opus, avise em uma linha antes do INIT: "a sessão está em Opus; troque para Sonnet 5.5 (ou Haiku 5.5) e rode de novo para cortar o custo do orquestrador". Continue se a pessoa mandar seguir. Os subagentes têm `model` (ID exato da versão 5.5) e `effort` fixos no frontmatter, então o custo deles não muda com a sessão.
+
+## Regra de contexto (dura)
+O seu contexto precisa durar o job inteiro, com várias rodadas. Por isso:
+- **Nunca leia inteiro** `spec.md`, `build.md`, `gates.md`, `review-*.md` nem `decision.md`. Decida pela **primeira linha** (`head -1 <arquivo>`) e pelo **relatório final** que cada agente devolve (bloco `RELATÓRIO <agente>`, no máximo 15 linhas).
+- Leitura parcial permitida, só quando for mostrar algo ao usuário: uma seção por cabeçalho, com `sed -n '/^## Dúvidas bloqueantes/,/^## /p' <arquivo>` ou `sed -n '/^## Motivo/,$p' <arquivo>`.
+- Para passar achados ao builder, passe **caminhos** dos arquivos, nunca um resumo seu.
+- Saída de comandos longos (gates, build, teste) vai para arquivo; você lê só `head -1` ou um `rg` filtrado. Nunca deixe `xcodebuild` imprimir no seu contexto.
+- Repasse ao usuário o relatório do agente como veio, sem reescrever.
+- Agente que não terminar com o bloco `RELATÓRIO`: confie só na primeira linha do arquivo. Se o arquivo também estiver malformado, aplique a regra de resiliência do passo correspondente.
+
+## Esperar agentes (não cutucar)
+- Dispare o agente e espere ele terminar. Nunca mande SendMessage do tipo "já acabou?" ou "como está?": cada mensagem dessas gasta contexto dos dois lados e interrompe o trabalho.
+- Revisores em paralelo: dispare todos na mesma mensagem e espere todos os relatórios.
+- Agente ou comando em background: espere a notificação de término. Não leia o arquivo de saída em laço nem use `sleep` para checar.
+- Gates podem passar de 10 minutos (`GATE_TIMEOUT_SECONDS`): rode-os em background, com a saída redirecionada para o arquivo, e espere a notificação. Um único comando bloqueante, nunca polling.
 
 ## Comandos
 
@@ -38,7 +57,7 @@ Regras gerais:
   "branch": "factory/003-login-biometrico",
   "worktree": "../qubit-factory-factory/003-login-biometrico",
   "reviewers": [],
-  "events": [{"at": "ISO-8601", "agent": "builder", "model": "opus", "round": 1, "note": ""}]
+  "events": [{"at": "ISO-8601", "agent": "builder", "model": "claude-opus-5-5", "effort": "high", "round": 1, "note": ""}]
 }
 ```
 
@@ -53,15 +72,15 @@ Atualize `job.json` a cada transição. Cada chamada de agente vira um item em `
 4. Rode `bash scripts/factory-gates.sh baseline "$WT"` e guarde a saída em `baseline.md`. Isso registra o que já estava quebrado antes do job; o builder e os gates só respondem pelo que ele mudou.
 
 ### 2. SPEC
-Spawne `spec-writer` (opus). Entrada: descrição, tipo, caminho do job, `$WT`. Saída: `spec.md`.
-O spec deve ter critérios de aceitação numerados e verificáveis (`AC-1`, `AC-2`...). Se o spec contiver uma seção `## Dúvidas bloqueantes` não vazia, pare com status `needs-human` e mostre as dúvidas ao usuário.
+Spawne `spec-writer` (`claude-opus-5-5`). Entrada: descrição, tipo, caminho do job, `$WT`. Saída: `spec.md`.
+O spec deve ter critérios de aceitação numerados e verificáveis (`AC-1`, `AC-2`...). Se o relatório vier com `resultado: BLOQUEADO` (seção `## Dúvidas bloqueantes` não vazia), pare com status `needs-human` e mostre as dúvidas do relatório ao usuário. Não leia o spec para isso.
 
 ### 3. BUILD
-Spawne `builder` (opus) com `cwd` = `$WT`. Entrada: `spec.md`, `lessons.md`, `baseline.md`, e na rodada > 1 os arquivos de `round-<n-1>/` e `gates.md`. Saída: commits em `factory/<id>` e `build.md`.
+Spawne `builder` (`claude-opus-5-5`) com `cwd` = `$WT`. Entrada: `spec.md`, `lessons.md`, `baseline.md`, e na rodada > 1 os arquivos de `round-<n-1>/` e `gates.md`. Saída: commits em `factory/<id>` e `build.md`.
 Na rodada de retrabalho, **retome o mesmo builder** (SendMessage) em vez de criar outro.
 
 ### 4. GATES (determinístico, sem LLM)
-Rode `bash scripts/factory-gates.sh run "$WT"`. Saída em `round-<n>/gates.md` (primeira linha `GATES: PASS` ou `GATES: FAIL`).
+Rode `bash scripts/factory-gates.sh run "$WT" > "$JOB/round-<n>/gates.md" 2>&1` (em background se puder passar de 10 min) e leia só `head -1` (`GATES: PASS` ou `GATES: FAIL`).
 - `FAIL`: não gaste revisores. Conte como rodada e volte ao BUILD com o `gates.md`.
 - `PASS`: siga para REVIEW.
 
@@ -70,16 +89,16 @@ Decida os revisores a partir do diff (`git -C "$WT" diff --name-only master...HE
 
 | Revisor | Quando roda | Modelo |
 |---|---|---|
-| `reviewer-tests` | sempre | opus |
-| `reviewer-code` | sempre | sonnet |
-| `reviewer-security` | sempre | opus |
-| `reviewer-ui` | diff toca `*.swift` com `import SwiftUI`/`UIKit`, `*.xcassets`, `*.storyboard`, `*.xib`, `*.strings`, `*.xcstrings` | sonnet |
-| `reviewer-ux` | mesma condição do `reviewer-ui` e tipo ≠ refactor | sonnet |
+| `reviewer-tests` | sempre | `claude-opus-5-5` |
+| `reviewer-code` | sempre | `claude-sonnet-5-5` |
+| `reviewer-security` | sempre | `claude-opus-5-5` |
+| `reviewer-ui` | diff toca `*.swift` com `import SwiftUI`/`UIKit`, `*.xcassets`, `*.storyboard`, `*.xib`, `*.strings`, `*.xcstrings` | `claude-sonnet-5-5` |
+| `reviewer-ux` | mesma condição do `reviewer-ui` e tipo ≠ refactor | `claude-sonnet-5-5` |
 
 Grave a lista em `job.json.reviewers`. Spawne todos **em paralelo**, cada um escrevendo `round-<n>/review-<nome>.md`.
 Os revisores **não leem `build.md`**: eles verificam o diff e rodam o código por conta própria.
 
-**Resiliência:** a rodada só está completa quando todos os arquivos da lista existem e começam com `VERDICT: PASS` ou `VERDICT: CHANGES`. Arquivo ausente ou malformado: reexecute aquele revisor **uma vez**. Se falhar de novo, status `needs-human`.
+**Resiliência:** a rodada só está completa quando todos os arquivos da lista existem e começam com `VERDICT: PASS` ou `VERDICT: CHANGES` (confira com `head -1`, não lendo o arquivo). Arquivo ausente ou malformado: reexecute aquele revisor **uma vez**. Se falhar de novo, status `needs-human`.
 
 ### 6. DECIDIR
 - Todos `PASS`: vá para APPROVE.
@@ -87,8 +106,9 @@ Os revisores **não leem `build.md`**: eles verificam o diff e rodam o código p
 - Algum `CHANGES` e `round == max_rounds`: vá para APPROVE mesmo assim (o approver tende a `ESCALATE`).
 
 ### 7. APPROVE
-Spawne `approver` (opus). Entrada: `spec.md`, todos os `round-*/`, `baseline.md`. Saída: `decision.md`, primeira linha `APPROVE` ou `ESCALATE`.
-Antes de aceitar `APPROVE`, rode os gates **de novo** no estado final. Se `FAIL`, trate como `ESCALATE`.
+Spawne `approver` (`claude-opus-5-5`). Entrada: `spec.md`, todos os `round-*/`, `baseline.md`. Saída: `decision.md`, primeira linha `APPROVE` ou `ESCALATE` (leia com `head -1`).
+Antes de aceitar `APPROVE`, rode os gates **de novo** no estado final (`> "$JOB/final-gates.md"`, só `head -1`). Se `FAIL`, trate como `ESCALATE`.
+Em `ESCALATE`, mostre ao usuário só a seção `## Motivo` (`sed -n '/^## Motivo/,$p'`).
 
 ### 8. MERGE (só com `APPROVE`)
 1. Na raiz do repo, em `master` limpa: `git merge --no-ff factory/<id> -m "feat(<id>): <título>"`. O prefixo segue o tipo (`feat`, `fix`, `refactor`).
@@ -96,7 +116,9 @@ Antes de aceitar `APPROVE`, rode os gates **de novo** no estado final. Se `FAIL`
 3. Sucesso: status `merged`, remova o worktree (`git worktree remove`), marque `- [x]` no backlog se veio de `next`.
 
 ### 9. APRENDER
-Depois de `merged` ou `needs-human`, leia os `review-*.md` e `decision.md`. Se um mesmo tipo de achado apareceu em 2+ jobs (compare com `lessons.md`), acrescente uma linha curta e acionável em `factory/lessons.md`. Não registre achados únicos.
+Depois de `merged` ou `needs-human`, **não leia** os reviews você mesmo. Spawne `learner` (`claude-sonnet-5-5`, só leitura) com o caminho do job, de `factory/jobs/` e de `factory/lessons.md`. Registre a chamada em `events`; ela roda mesmo com `max_agent_calls` atingido.
+- `resultado: NENHUMA`: nada a fazer.
+- `resultado: LICOES`: acrescente ao fim de `factory/lessons.md`, na raiz do repo, cada linha do relatório que começa com `- `, como veio (`printf '%s\n' '<linha>' >> factory/lessons.md`).
 
 ## Tipos de job
 

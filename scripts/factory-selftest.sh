@@ -13,7 +13,7 @@ exit_is() { # exit_is <código> <comando...>
   local want="$1"; shift; "$@" >/dev/null 2>&1; [[ $? -eq $want ]]
 }
 
-AGENTS="spec-writer builder reviewer-tests reviewer-code reviewer-security reviewer-ui reviewer-ux approver"
+AGENTS="spec-writer builder reviewer-tests reviewer-code reviewer-security reviewer-ui reviewer-ux approver learner"
 REVIEWERS="reviewer-tests reviewer-code reviewer-security reviewer-ui reviewer-ux"
 SKILL=".claude/skills/factory/SKILL.md"
 
@@ -23,7 +23,12 @@ for a in $AGENTS; do
   f=".claude/agents/$a.md"
   check "$a: arquivo existe"                 test -f "$f"
   check "$a: frontmatter name == arquivo"    grep -q "^name: $a\$" "$f"
-  check "$a: declara model"                  grep -Eq '^model: (opus|sonnet|haiku)$' "$f"
+  check "$a: declara model 5.5 por ID exato" grep -Eq '^model: claude-(opus|sonnet|haiku)-5-5$' "$f"
+  check "$a: declara effort"                 grep -Eq '^effort: (low|medium|high|xhigh|max)$' "$f"
+  check "$a: termina com RELATÓRIO fixo"     grep -q "^RELATÓRIO $a\$" "$f"
+  if grep '^tools:' "$f" | grep -qw Bash; then
+    check "$a: manda saída de build para log" grep -q '^## Saída de comandos (nunca no contexto)' "$f"
+  fi
   check "$a: declara tools (menor privilégio)" grep -q '^tools: ' "$f"
   check "$a: citado no orquestrador"         grep -q "$a" "$SKILL"
 done
@@ -39,6 +44,11 @@ check "approver define APPROVE/ESCALATE"   grep -q 'APPROVE' .claude/agents/appr
 check "builder é o único com Edit"         bash -c "[[ \$(grep -l '^tools:.*Edit' .claude/agents/*.md | wc -l) -eq 1 ]]"
 check "orquestrador cita os 3 tipos"       bash -c "grep -q 'feature' $SKILL && grep -q 'bug' $SKILL && grep -q 'refactor' $SKILL"
 check "orquestrador define max_agent_calls" grep -q 'max_agent_calls' "$SKILL"
+check "orquestrador tem regra de contexto"  grep -q '^## Regra de contexto' "$SKILL"
+check "orquestrador lê só a primeira linha" grep -q 'head -1' "$SKILL"
+check "orquestrador não cutuca agentes"     grep -q '^## Esperar agentes' "$SKILL"
+check "orquestrador avisa sobre o modelo"   grep -q '^## Antes de começar: modelo da sessão' "$SKILL"
+check "learner é só leitura (sem Write/Edit/Bash)" bash -c "! grep '^tools:' .claude/agents/learner.md | grep -qwE 'Write|Edit|Bash'"
 
 echo "== Settings e arquivos de apoio"
 check "settings.json é JSON válido"        python3 -I -c 'import json;json.load(open(".claude/settings.json"))'
