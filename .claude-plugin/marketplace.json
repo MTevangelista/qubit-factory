@@ -1,0 +1,16 @@
+{
+  "name": "qubit-factory",
+  "owner": {
+    "name": "Matheus Evangelista"
+  },
+  "metadata": {
+    "description": "Fábrica de software com agentes para Claude Code: spec, build, gates, revisão e merge local."
+  },
+  "plugins": [
+    {
+      "name": "qubit",
+      "source": "./plugins/qubit",
+      "description": "Software factory independente de linguagem: /qubit roda spec, build, gates, revisão, aprovação e merge local."
+    }
+  ]
+}

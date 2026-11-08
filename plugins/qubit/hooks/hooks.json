@@ -1,0 +1,16 @@
+{
+  "description": "Guarda da fábrica qubit: bloqueia git push, comandos destrutivos e edição de gates, hooks e config dentro dos worktrees.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/guard.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
