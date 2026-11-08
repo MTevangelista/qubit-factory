@@ -53,6 +53,7 @@ INIT (worktree + baseline) -> SPEC -> BUILD -> GATES --FAIL--> BUILD
 - **Guarda** (`.claude/hooks/guard.sh`): bloqueia `git push`, `rm -rf` amplo e edição de gates/hooks/config dentro de worktrees.
 - **Resiliência:** revisor sem arquivo válido roda de novo uma vez, depois escala; conflito de merge tem uma tentativa de rebase, depois escala.
 - **Memória:** achados repetidos em 2+ jobs viram linha em `lessons.md`.
+- **Autoteste:** `bash scripts/factory-selftest.sh` valida agentes, formatos de veredito, hook e gates sem gastar nenhuma chamada de LLM. Rode depois de mexer em qualquer prompt.
 - **Estado:** `factory/jobs/` é local e ignorado pelo git; worktrees ficam em `../qubit-factory-factory/`.
 
 ## Limites conhecidos
