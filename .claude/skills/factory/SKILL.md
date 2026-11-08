@@ -111,7 +111,7 @@ Antes de aceitar `APPROVE`, rode os gates **de novo** no estado final (`> "$JOB/
 Em `ESCALATE`, mostre ao usuário só a seção `## Motivo` (`sed -n '/^## Motivo/,$p'`).
 
 ### 8. MERGE (só com `APPROVE`)
-1. Na raiz do repo, em `master` limpa: `git merge --no-ff factory/<id> -m "feat(<id>): <título>"`. O prefixo segue o tipo (`feat`, `fix`, `refactor`).
+1. Na raiz do repo, em `master` limpa: `git merge --no-ff factory/<id> -m "feat(<id>): <title>"`. O prefixo segue o tipo (`feat`, `fix`, `refactor`) e o título vai em inglês, no imperativo (traduza o título do spec se preciso).
 2. **Conflito:** `git merge --abort`, uma tentativa de `git rebase master` dentro de `$WT` feita pelo builder (retome-o), gates de novo e tente o merge uma segunda vez. Se falhar de novo: `needs-human`, sem forçar nada.
 3. Sucesso: status `merged`, remova o worktree (`git worktree remove`), marque `- [x]` no backlog se veio de `next`.
 

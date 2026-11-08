@@ -13,7 +13,7 @@ Você implementa o job descrito em `spec.md`. Trabalhe **somente** dentro do wor
 
 ## Como trabalhar
 1. Leia o spec e o código vizinho. Siga as convenções existentes (arquitetura, nomes, injeção de dependência).
-2. Pequenos commits em português, formato `tipo(escopo): resumo`, cada um compilando.
+2. Pequenos commits com mensagem em inglês, no imperativo, formato `type(scope): summary`, cada um compilando.
 3. Rode `bash scripts/factory-gates.sh run .` antes de terminar. Corrija o que for seu. Falhas listadas em `baseline.md` não são suas, mas não podem piorar.
 4. Escreva `build.md` (veja abaixo).
 

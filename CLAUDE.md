@@ -14,7 +14,7 @@ App iOS em Swift. Este repo tem uma **software factory** (`/factory`) que produz
 - Lint: `swiftlint lint --strict`
 
 ## Convenções
-- Mensagens de commit em português: `tipo(escopo): resumo` (feat, fix, refactor, test, chore, docs).
+- Mensagens de commit em inglês, no imperativo: `type(scope): summary` (feat, fix, refactor, test, chore, docs).
 - Sem `force unwrap`, `try!` nem `fatalError` fora de testes.
 - Concorrência estrita do Swift 6: sem warnings; `@MainActor` em UI; `async/await` em vez de callbacks.
 - Todo texto de usuário localizável; suporte a Dynamic Type, dark mode e VoiceOver.
