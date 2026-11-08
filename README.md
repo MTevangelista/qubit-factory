@@ -1,14 +1,15 @@
 # qubit-factory
 
-Uma **software factory** independente de linguagem (hoje configurada para um app iOS em Swift 6 / SwiftUI): o comando `/qubit` recebe um pedido (feature, bug ou refactor) e um time de agentes escreve o spec, implementa numa branch isolada, passa por gates determinísticos, é revisado por especialistas e, se tudo estiver certo, faz o merge local na `master`. Quando algo foge do previsto, a fábrica para e chama você.
+Uma **software factory** independente de linguagem (hoje configurada para um app iOS em Swift 6 / SwiftUI): o comando `/qubit` recebe um pedido (feature, bug ou refactor) e um time de agentes escreve o spec, implementa numa branch isolada, passa por gates determinísticos, é revisado por especialistas e, se tudo estiver certo, faz o merge local na branch base (`FACTORY_BASE_BRANCH`, aqui `master`). Quando algo foge do previsto, a fábrica para e chama você.
 
 A stack não está fixa no código da fábrica: ela vem de um **perfil** (`ios`, `android`, `web`, `python` ou `generic`), escolhido em `factory/config.sh`. Veja [Perfis de stack](#perfis-de-stack).
 
-> Referência técnica curta: [`factory/README.md`](factory/README.md). Regra completa do orquestrador: [`.claude/skills/qubit/SKILL.md`](.claude/skills/qubit/SKILL.md).
+> Referência técnica curta: [`factory/README.md`](factory/README.md). Regra completa do orquestrador: [`plugins/qubit/skills/qubit/SKILL.md`](plugins/qubit/skills/qubit/SKILL.md).
 
 ## Sumário
 
 - [Visão geral](#visão-geral)
+- [Usar em outro projeto](#usar-em-outro-projeto)
 - [Fluxo completo](#fluxo-completo)
 - [Etapas em detalhe](#etapas-em-detalhe)
 - [Comandos e exemplos](#comandos-e-exemplos)
@@ -27,21 +28,42 @@ A stack não está fixa no código da fábrica: ela vem de um **perfil** (`ios`,
 
 | Peça | Onde | O que faz |
 |---|---|---|
-| Orquestrador | [`.claude/skills/qubit/SKILL.md`](.claude/skills/qubit/SKILL.md) | A sessão que recebe `/qubit`. Dispara agentes, roda gates, é o único que escreve `job.json` e faz o merge. |
-| Subagentes (9) | [`.claude/agents/`](.claude/agents/) | Spec, build, 5 revisores, aprovação e aprendizado. Cada um escreve só o próprio arquivo. |
-| Gates | [`scripts/factory-gates.sh`](scripts/factory-gates.sh) | Verificação sem LLM: segredos no diff, lint/formato/tipos, build e testes, com os comandos do perfil. |
-| Guarda | [`.claude/hooks/guard.sh`](.claude/hooks/guard.sh) | Hook `PreToolUse` que bloqueia `git push`, `rm -rf` amplo e edição de gates/config pelos agentes. |
+| Orquestrador | [`plugins/qubit/skills/qubit/SKILL.md`](plugins/qubit/skills/qubit/SKILL.md) | A sessão que recebe `/qubit`. Dispara agentes, roda gates, é o único que escreve `job.json` e faz o merge. |
+| Subagentes (9) | [`plugins/qubit/agents/`](plugins/qubit/agents/) | Spec, build, 5 revisores, aprovação e aprendizado. Cada um escreve só o próprio arquivo. |
+| Gates | [`plugins/qubit/scripts/factory-gates.sh`](plugins/qubit/scripts/factory-gates.sh) | Verificação sem LLM: segredos no diff, lint/formato/tipos, build e testes, com os comandos do perfil. |
+| Guarda | [`plugins/qubit/hooks/guard.sh`](plugins/qubit/hooks/guard.sh) | Hook `PreToolUse` que bloqueia `git push`, `rm -rf` amplo e edição de gates/config pelos agentes. |
 | Config | [`factory/config.sh`](factory/config.sh) | Perfil de stack, comandos dos gates, limites de rodadas e de chamadas. |
-| Perfis | [`factory/profiles/`](factory/profiles/) | Um par `<perfil>.sh` (comandos e detecção) + `<perfil>.md` (convenções e checklists dos agentes) por stack. |
+| Perfis | [`plugins/qubit/profiles/`](plugins/qubit/profiles/) | Um par `<perfil>.sh` (comandos e detecção) + `<perfil>.md` (convenções e checklists dos agentes) por stack. |
 | Fila | [`factory/backlog.md`](factory/backlog.md) | Itens consumidos por `/qubit next`. |
 | Memória | [`factory/lessons.md`](factory/lessons.md) | Lições aprendidas entre jobs, lidas pelo builder e pelo spec-writer. |
 | Estado | `factory/jobs/<job-id>/` | Arquivos de cada job (local, fora do git). |
 | Dashboard | [`factory/dashboard.html`](factory/dashboard.html) | Linha do tempo, rodadas e decisões de cada job. |
 
+O que é igual em todo projeto (skill, agentes, hook, gates, perfis e templates) fica no plugin [`plugins/qubit/`](plugins/qubit/). O que é de cada projeto (`factory/config.sh`, `lessons.md`, `backlog.md`, `jobs/`, a seção da fábrica no `CLAUDE.md` e as permissões em `.claude/settings.json`) fica no projeto. Este repo usa o plugin direto da pasta, por links em `.claude/agents` e `.claude/skills/qubit`.
+
+## Usar em outro projeto
+
+A fábrica é distribuída como **plugin do Claude Code**; este repo é o marketplace ([`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json)).
+
+1. No Claude Code, dentro do outro projeto, adicione o marketplace e instale o plugin no escopo do projeto:
+   ```
+   /plugin marketplace add MTevangelista/qubit-factory
+   /plugin install qubit@qubit-factory
+   ```
+   Pelo GitHub, o plugin vem da branch padrão do repo (precisa estar publicado). Antes disso, use o caminho local: `/plugin marketplace add /caminho/para/qubit-factory`.
+   Prefira o escopo de projeto: o hook de guarda vale em toda sessão onde o plugin está ativo.
+2. Rode `/qubit init` (ou `/qubit init web`, para forçar o perfil). Ele detecta a stack e a branch base, cria `factory/config.sh`, `lessons.md`, `backlog.md`, `dashboard.html` e `jobs/`, ignora `factory/jobs` no `.gitignore`, acrescenta a seção da fábrica ao `CLAUDE.md` e adiciona as permissões do perfil em `.claude/settings.json`. Nunca sobrescreve arquivo existente.
+3. Preencha os campos `_preencher_` do `CLAUDE.md`, revise `factory/config.sh` e faça commit na branch base.
+4. Rode `/qubit <descrição>`.
+
+Os worktrees de cada projeto ficam em `../<repo>-factory/<job-id>`. Melhorias no plugin chegam aos projetos com `/plugin marketplace update qubit-factory` (incremente `version` em [`plugin.json`](plugins/qubit/.claude-plugin/plugin.json) a cada mudança).
+
+Instalada como plugin, a skill pode aparecer como `/qubit:qubit` e os agentes como `qubit:builder` etc.; o orquestrador usa o nome que estiver disponível.
+
 **Princípios:**
 
 1. **Estado em arquivos, não na conversa.** Os agentes recebem caminhos, nunca resumos.
-2. **Isolamento.** Cada job roda num `git worktree` próprio (`../qubit-factory-factory/<job-id>`) na branch `factory/<job-id>`.
+2. **Isolamento.** Cada job roda num `git worktree` próprio (`../<repo>-factory/<job-id>`) na branch `factory/<job-id>`.
 3. **Verificação barata primeiro.** Gates determinísticos rodam antes de qualquer revisor; falha de gate não gasta LLM.
 4. **Revisão independente.** Revisores não leem o relato do builder: conferem o diff e rodam o código.
 5. **Nada sai da máquina.** Nunca há `git push`; o merge é local e só acontece com `APPROVE`.
@@ -52,7 +74,7 @@ A stack não está fixa no código da fábrica: ela vem de um **perfil** (`ios`,
 
 ![Fluxo completo da fábrica /qubit](docs/images/factory-flow.svg)
 
-> A imagem é um SVG versionado em [`docs/images/factory-flow.svg`](docs/images/factory-flow.svg). Ao mudar o fluxo em `.claude/skills/qubit/SKILL.md`, atualize a imagem junto.
+> A imagem é um SVG versionado em [`docs/images/factory-flow.svg`](docs/images/factory-flow.svg). Ao mudar o fluxo em `plugins/qubit/skills/qubit/SKILL.md`, atualize a imagem junto.
 
 Status possíveis de um job (`job.json.status`): `spec` → `building` → `gates` → `reviewing` → `approving` → `merged`, ou `needs-human` / `failed`.
 
@@ -69,7 +91,7 @@ Status possíveis de um job (`job.json.status`): `spec` → `building` → `gate
 | 5 | **REVIEW** | revisores em paralelo | diff + código (sem `build.md`) | `round-<n>/review-<nome>.md` (`VERDICT: PASS/CHANGES`) | DECIDIR |
 | 6 | **DECIDIR** | orquestrador | primeira linha de cada review | — | todos `PASS` → APPROVE · `CHANGES` → BUILD (ou APPROVE na última rodada) |
 | 7 | **APPROVE** | `approver` + gates finais | spec, todas as rodadas, baseline | `decision.md` (`APPROVE`/`ESCALATE`), `final-gates.md` | MERGE ou `needs-human` |
-| 8 | **MERGE** | orquestrador | branch `factory/<id>` | merge `--no-ff` na `master` | `merged`, ou `needs-human` em conflito persistente |
+| 8 | **MERGE** | orquestrador | branch `factory/<id>` | merge `--no-ff` na branch base | `merged`, ou `needs-human` em conflito persistente |
 | 9 | **APRENDER** | `learner` (só leitura) | job atual + jobs anteriores | linhas novas em `lessons.md` | fim |
 
 **Quais revisores rodam:**
@@ -79,7 +101,7 @@ Status possíveis de um job (`job.json.status`): `spec` → `building` → `gate
 | `reviewer-tests` | sempre |
 | `reviewer-code` | sempre |
 | `reviewer-security` | sempre |
-| `reviewer-ui` | `bash scripts/factory-gates.sh ui <wt>` responde `UI: yes` (o perfil define quais arquivos são interface; no `ios`: `.swift` com `import SwiftUI`/`UIKit`, `*.xcassets`, `*.storyboard`, `*.xib`, `*.strings`, `*.xcstrings`) |
+| `reviewer-ui` | `bash plugins/qubit/scripts/factory-gates.sh ui <wt>` responde `UI: yes` (o perfil define quais arquivos são interface; no `ios`: `.swift` com `import SwiftUI`/`UIKit`, `*.xcassets`, `*.storyboard`, `*.xib`, `*.strings`, `*.xcstrings`) |
 | `reviewer-ux` | mesma condição do `reviewer-ui` **e** o job não é refactor |
 
 **Commit de merge:** `type(<job-id>): <title>` em inglês, no imperativo, com `type` = `feat`, `fix` ou `refactor` conforme o tipo do job.
@@ -92,6 +114,7 @@ Status possíveis de um job (`job.json.status`): `spec` → `building` → `gate
 
 | Comando | O que faz |
 |---|---|
+| `/qubit init [perfil]` | Prepara o projeto para a fábrica (config, arquivos, permissões). Veja [Usar em outro projeto](#usar-em-outro-projeto). |
 | `/qubit <descrição>` | Novo job; o tipo (feature, bug, refactor) é inferido da descrição. |
 | `/qubit --feature <descrição>` | Força o tipo feature. |
 | `/qubit --bug <descrição>` | Força bug: exige teste de regressão que falha antes e passa depois. |
@@ -155,13 +178,13 @@ Depois abra http://localhost:8000/dashboard.html.
 Rodar os gates manualmente:
 
 ```bash
-bash scripts/factory-gates.sh run .
+bash plugins/qubit/scripts/factory-gates.sh run .
 ```
 
 Autoteste da fábrica (sem LLM; rode depois de mexer em agentes, hook, gates ou skill):
 
 ```bash
-bash scripts/factory-selftest.sh
+bash plugins/qubit/scripts/factory-selftest.sh
 ```
 
 Inspecionar um job:
@@ -185,20 +208,20 @@ A fábrica é autônoma no caminho feliz. Ela **para com status `needs-human`** 
 | **Gates finais falharam** depois de um `APPROVE` | `final-gates.md` | Trate como `ESCALATE`: `rework` com a correção esperada. |
 | **Revisor falhou duas vezes** (arquivo ausente ou sem `VERDICT:` válido) | `round-<n>/review-<nome>.md` | Veja o que travou o revisor; normalmente `rework` ou rodar de novo resolve. |
 | **Teto de custo atingido** (`len(events) >= max_agent_calls`) | `decision.md` escrito pelo orquestrador | Avalie se vale continuar (`rework`) ou abandonar; ajuste o limite em `factory/config.sh` se for o caso. |
-| **Conflito de merge persistente** (falhou mesmo após rebase automático) | saída do merge | Resolva o conflito à mão na `master` ou peça `rework` depois de atualizar a base. |
+| **Conflito de merge persistente** (falhou mesmo após rebase automático) | saída do merge | Resolva o conflito à mão na branch base ou peça `rework` depois de atualizar a base. |
 
 ### Decisões que são sempre suas
 
 - **Configurar o projeto** antes do primeiro uso: escolher o perfil e preencher `factory/config.sh` (comandos que o perfil não detectar; no `ios`, o scheme) e as seções `_preencher_` do [`CLAUDE.md`](CLAUDE.md). Sem isso os gates falham de propósito.
 - **Escolher o modelo da sessão** (Sonnet 5.5 ou Haiku 5.5) antes de `/qubit`.
 - **Aprovar dependências de terceiros:** só entram se o spec disser explicitamente.
-- **Alterar as regras da fábrica:** `.claude/`, `scripts/factory-*`, `factory/config.sh`, `factory/profiles/`, `factory/lessons.md` e `CLAUDE.md`. O hook impede os agentes de mexer nesses arquivos dentro dos worktrees.
-- **Publicar:** a fábrica nunca faz `git push`. Subir a `master` para o remoto é com você.
+- **Alterar as regras da fábrica:** `.claude/`, `plugins/qubit/`, `factory/config.sh`, `factory/profiles/`, `factory/lessons.md` e `CLAUDE.md`. O hook impede os agentes de mexer nesses arquivos dentro dos worktrees.
+- **Publicar:** a fábrica nunca faz `git push`. Subir a branch base para o remoto é com você.
 - **Curar as lições:** o `learner` acrescenta linhas a `lessons.md`; revise de vez em quando e remova o que não fizer mais sentido.
 - **Abandonar um job:** não há comando; remova o worktree e a branch:
 
 ```bash
-git worktree remove ../qubit-factory-factory/<job-id>
+git worktree remove ../<repo>-factory/<job-id>
 ```
 
 ```bash
@@ -256,7 +279,7 @@ factory/jobs/004-onboarding/
 └── logs/               # saída completa de build e testes
 ```
 
-O worktree do job fica fora do repo, em `../qubit-factory-factory/<job-id>`, e é removido depois do merge.
+O worktree do job fica fora do repo, em `../<repo>-factory/<job-id>`, e é removido depois do merge.
 
 O **dashboard** (`factory/dashboard.html`) lê esses arquivos e mostra etapas, linha do tempo e abas por rodada. Sirva a pasta `factory` com `python3 -m http.server -d factory 8000`.
 
@@ -264,7 +287,7 @@ O **dashboard** (`factory/dashboard.html`) lê esses arquivos e mostra etapas, l
 
 ## Perfis de stack
 
-Tudo o que depende de linguagem fica em [`factory/profiles/`](factory/profiles/). Cada perfil tem dois arquivos:
+Tudo o que depende de linguagem fica em [`plugins/qubit/profiles/`](plugins/qubit/profiles/). Cada perfil tem dois arquivos:
 
 - **`<perfil>.sh`**: lido pelos gates. Detecta o projeto e preenche os comandos que a config deixou vazios; declara quais arquivos contam como interface.
 - **`<perfil>.md`**: lido pelos agentes. Seções fixas (`Stack`, `Código`, `Testes`, `Segurança`, `UI`, `UX`, `Spec`, `Logs`, `Skills`); cada agente lê só as do seu papel.
@@ -277,7 +300,7 @@ Tudo o que depende de linguagem fica em [`factory/profiles/`](factory/profiles/)
 | `python` | Python | `uv sync`/`poetry install`; `ruff check`, `ruff format --check`, `mypy` se configurado, `pytest` |
 | `generic` | qualquer | nenhum: tudo vem da config |
 
-Para outra stack (Go, Rust, Flutter...), copie `generic.sh`/`generic.md`, preencha e rode o autoteste. O contrato completo está em [`factory/profiles/README.md`](factory/profiles/README.md). As convenções específicas do projeto continuam no [`CLAUDE.md`](CLAUDE.md) e vencem o perfil.
+Para outra stack (Go, Rust, Flutter...), copie `generic.sh`/`generic.md`, preencha e rode o autoteste. O contrato completo está em [`plugins/qubit/profiles/README.md`](plugins/qubit/profiles/README.md). As convenções específicas do projeto continuam no [`CLAUDE.md`](CLAUDE.md) e vencem o perfil.
 
 ---
 
@@ -287,7 +310,8 @@ Para outra stack (Go, Rust, Flutter...), copie `generic.sh`/`generic.md`, preenc
 
 | Variável | Padrão | Para quê |
 |---|---|---|
-| `FACTORY_PROFILE` | `ios` | perfil de stack (`factory/profiles/<perfil>.sh` + `.md`) |
+| `FACTORY_PROFILE` | `ios` | perfil de stack (`plugins/qubit/profiles/<perfil>.sh` + `.md`; `factory/profiles/` do projeto vence) |
+| `FACTORY_BASE_BRANCH` | `master` | onde os worktrees nascem e o merge acontece; vazio = `origin/HEAD`, `master` ou `main` |
 | `FACTORY_SETUP_CMD` | vazio (perfil) | instala dependências antes dos gates |
 | `FACTORY_LINT_CMD` / `FACTORY_FORMAT_CMD` / `FACTORY_TYPECHECK_CMD` | vazio (perfil) | opcionais; binário ausente = pulado |
 | `FACTORY_BUILD_CMD` | vazio (perfil) | opcional em linguagens interpretadas |
@@ -310,11 +334,11 @@ Valor preenchido na config sempre vence o padrão do perfil. Mantenha os comando
 - **Revisores independentes:** não leem `build.md`; verificam o diff e rodam o código.
 - **Gates finais:** mesmo com `APPROVE`, os gates rodam de novo antes do merge.
 - **Teto de custo:** `max_rounds` e `max_agent_calls` por job; cada chamada fica registrada em `job.json`.
-- **Hook de guarda:** bloqueia `git push`, apagar `master`/`main`, `reset --hard origin`, `rm -rf` amplo, `curl | sh`, e edição de `.claude/`, `scripts/factory-*`, `factory/config.sh`, `factory/profiles/`, `factory/lessons.md` e `CLAUDE.md` dentro dos worktrees.
+- **Hook de guarda:** bloqueia `git push`, apagar `master`/`main`, `reset --hard origin`, `rm -rf` amplo, `curl | sh`, e edição de `.claude/`, `plugins/qubit/`, `factory/config.sh`, `factory/profiles/`, `factory/lessons.md` e `CLAUDE.md` dentro dos worktrees.
 - **Resiliência:** revisor com saída inválida roda de novo uma vez; conflito de merge tem uma tentativa de rebase. Depois disso, escala.
 - **Contexto enxuto:** o orquestrador decide pela primeira linha dos arquivos e pelo `RELATÓRIO` dos agentes; saída de build vai para `logs/`.
 - **Memória:** achados repetidos em 2+ jobs viram linha em `lessons.md`.
-- **Autoteste:** `scripts/factory-selftest.sh` valida estrutura dos agentes, formatos de veredito, hook e gates sem gastar LLM.
+- **Autoteste:** `plugins/qubit/scripts/factory-selftest.sh` valida estrutura dos agentes, formatos de veredito, hook e gates sem gastar LLM.
 
 ---
 
@@ -330,7 +354,7 @@ Valor preenchido na config sempre vence o padrão do perfil. Mantenha os comando
 
 Resumo; a fonte é o [`CLAUDE.md`](CLAUDE.md).
 
-- Perfil atual: `ios` (Swift 6, SwiftUI); as regras da stack estão em [`factory/profiles/ios.md`](factory/profiles/ios.md).
+- Perfil atual: `ios` (Swift 6, SwiftUI); as regras da stack estão em [`plugins/qubit/profiles/ios.md`](plugins/qubit/profiles/ios.md).
 - Texto localizável e acessível.
 - Segredos fora do repo; dados sensíveis no armazenamento seguro da plataforma.
 - Dependência de terceiros só com aprovação no spec.

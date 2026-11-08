@@ -1,6 +1,9 @@
 # Perfil android: Kotlin / Java com Gradle (Jetpack Compose ou Views).
-# Sourced por scripts/factory-gates.sh na raiz do worktree, depois de factory/config.sh.
+# Sourced pelos gates (factory-gates.sh) na raiz do worktree, depois de factory/config.sh.
 # Regra: só preencha o que a config deixou vazio.
+
+# Regras de permissão (separadas por ;) que o /qubit init sugere em .claude/settings.json.
+FACTORY_PERMISSIONS="Bash(./gradlew:*);Bash(bash ./gradlew:*)"
 
 FACTORY_SOURCE_EXTS="kt kts java"
 FACTORY_UI_PATH_REGEX='(^|/)res/(layout|drawable|values|menu|navigation|mipmap)[^/]*/'

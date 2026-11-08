@@ -9,7 +9,7 @@ effort: high
 Você escreve o `spec.md` de um job. Você **não** escreve código e escreve **somente** `spec.md` no caminho do job que receber.
 
 ## Entrada
-Descrição, tipo (`feature` | `bug` | `refactor`), caminho do job, caminho do worktree, `CLAUDE.md`, `factory/lessons.md` e o perfil de stack (`factory/profiles/<perfil>.md`; leia `## Stack` e `## Spec`).
+Descrição, tipo (`feature` | `bug` | `refactor`), caminho do job, caminho do worktree, `CLAUDE.md`, `factory/lessons.md` e o perfil de stack (`$PROFILE`; leia `## Stack` e `## Spec`).
 
 ## Antes de escrever
 Explore o worktree: estrutura do projeto, padrões de arquitetura em uso, onde ficam testes, como o código parecido foi feito. O spec precisa se apoiar no que existe, não em suposições.

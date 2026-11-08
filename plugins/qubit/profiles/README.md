@@ -12,7 +12,7 @@ A fábrica não depende de linguagem. Tudo o que é específico de uma stack fic
 
 Cada perfil tem dois arquivos:
 
-- **`<perfil>.sh`**: lido por `scripts/factory-gates.sh`. Preenche os comandos que a config deixou vazios e declara quais arquivos contam como interface.
+- **`<perfil>.sh`**: lido por `scripts/factory-gates.sh` (do plugin). Preenche os comandos que a config deixou vazios e declara quais arquivos contam como interface.
 - **`<perfil>.md`**: lido pelos agentes. Convenções e checklists por papel.
 
 ## Contrato do `<perfil>.sh`
@@ -29,8 +29,9 @@ Cada perfil tem dois arquivos:
 | `FACTORY_UI_PATH_REGEX` | regex (ERE) sobre o caminho dos arquivos do diff que contam como interface |
 | `FACTORY_UI_CONTENT_REGEX` | regex (ERE) sobre o conteúdo dos arquivos do diff que contam como interface |
 | `FACTORY_PROFILE_ERROR` | mensagem de erro de configuração (ex.: scheme ausente); faz o gate falhar |
+| `FACTORY_PERMISSIONS` | regras de permissão do Claude Code, separadas por `;`, que o `/qubit init` adiciona em `.claude/settings.json` (ex.: `Bash(xcodebuild:*)`) |
 
-Os revisores de UI e UX só rodam quando `bash scripts/factory-gates.sh ui <wt>` responde `UI: yes`. Perfil sem as duas regex nunca chama esses revisores.
+Os revisores de UI e UX só rodam quando `factory-gates.sh ui <wt>` responde `UI: yes`. Perfil sem as duas regex nunca chama esses revisores.
 
 ## Contrato do `<perfil>.md`
 
@@ -48,11 +49,13 @@ As seções abaixo são obrigatórias (o autoteste confere). Cada agente lê só
 | `## Logs` | todo agente que roda build ou teste |
 | `## Skills` | `builder` e revisores |
 
+## Onde os perfis ficam
+
+Os gates procuram `factory/profiles/<perfil>.sh` (e `.md`) **no projeto** primeiro e, se não acharem, usam os do plugin (esta pasta). Assim um projeto pode ajustar um perfil sem fork do plugin.
+
 ## Criar um perfil
 
-1. Copie `generic.sh` e `generic.md` para `<nome>.sh` e `<nome>.md`.
-2. Preencha a detecção de comandos no `.sh` e as seções no `.md`.
-3. Rode `bash scripts/factory-selftest.sh`.
-4. Troque `FACTORY_PROFILE` em `factory/config.sh`.
+- **Para todos os projetos:** copie `generic.sh` e `generic.md` desta pasta para `<nome>.sh` e `<nome>.md`, preencha a detecção de comandos no `.sh` e as seções no `.md`, rode `bash plugins/qubit/scripts/factory-selftest.sh` e incremente `version` em `.claude-plugin/plugin.json`.
+- **Só para um projeto:** crie `factory/profiles/<nome>.sh` e `.md` no projeto e troque `FACTORY_PROFILE` em `factory/config.sh`.
 
 Perfis são regras da fábrica: só uma pessoa os altera. O hook `guard.sh` impede os agentes de editá-los dentro de um worktree.

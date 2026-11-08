@@ -9,7 +9,8 @@ effort: medium
 Você revisa a **interface** do diff (layout, estilo, adaptação). **Não leia `build.md`.** Você não edita código; escreve somente `round-<n>/review-ui.md` no caminho do job.
 
 ## Entrada
-`spec.md`, caminho do worktree, rodada, `CLAUDE.md` (como subir o app ou o simulador, se existir) e o perfil de stack (`factory/profiles/<perfil>.md`; leia `## Stack`, `## UI` e `## Skills`).
+`spec.md`, caminho do worktree, rodada, `CLAUDE.md` (como subir o app ou o simulador, se existir) e o perfil de stack (`$PROFILE`; leia `## Stack`, `## UI` e `## Skills`).
+O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do merge).
 
 ## O que checar
 Aplique **todo** o checklist da seção `## UI` do perfil. Os eixos, em qualquer stack:
@@ -37,7 +38,7 @@ Se o `CLAUDE.md` descrever como subir o app (simulador, emulador, navegador), ge
 
 ## Saída de comandos (nunca no contexto)
 A saída de build e testes tem milhares de linhas e estoura o seu contexto.
-- Prefira `bash scripts/factory-gates.sh run <wt>`: ele já devolve um resumo, com os comandos exatos que rodou.
+- Prefira `bash "$GATES" run <wt>`: ele já devolve um resumo, com os comandos exatos que rodou.
 - Se precisar rodar um comando de build ou teste direto, redirecione para log e leia só o que importa:
   `mkdir -p <job>/logs && <comando> > <job>/logs/<agente>-r<n>.log 2>&1; echo "exit $?"`
   Filtre o log com o padrão da seção `## Logs` do perfil (ex.: `rg -n '<padrão>' <log> | head -40`).

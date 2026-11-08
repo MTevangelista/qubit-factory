@@ -1,6 +1,6 @@
 ---
 name: qubit
-description: Software factory independente de linguagem (a stack vem do perfil em factory/config.sh). Use para rodar um job completo (spec, build, gates, revisão, aprovação, merge) de uma feature, bug ou refactor. Comandos - /qubit <descrição>, /qubit --bug|--refactor <descrição>, /qubit next, /qubit status, /qubit approve <job-id>, /qubit rework <job-id> <nota>.
+description: Software factory independente de linguagem (a stack vem do perfil em factory/config.sh). Use para rodar um job completo (spec, build, gates, revisão, aprovação, merge) de uma feature, bug ou refactor, ou para instalar a fábrica num projeto. Comandos - /qubit init [perfil], /qubit <descrição>, /qubit --bug|--refactor <descrição>, /qubit next, /qubit status, /qubit approve <job-id>, /qubit rework <job-id> <nota>.
 ---
 
 # Orquestrador da fábrica
@@ -10,8 +10,16 @@ Você (a sessão que recebeu `/qubit`) é o **orquestrador**. Você spawna os su
 Regras gerais:
 
 - Estado vive em arquivos em `factory/jobs/<job-id>/`, nunca na conversa. Passe aos agentes **caminhos**, não resumos.
-- Raiz do repo = `$REPO`. Pasta do job = `$REPO/factory/jobs/<job-id>` (`$JOB`). Worktree do job = `../qubit-factory-factory/<job-id>` (`$WT`). Nunca trabalhe na raiz do repo, exceto para o merge final.
-- Leia `factory/config.sh` (limites, comandos e `FACTORY_PROFILE`) antes de começar. O perfil de stack é `$PROFILE` = `$REPO/factory/profiles/<FACTORY_PROFILE>.md`; se o arquivo não existir, pare e avise o usuário. Passe `$PROFILE` a **todo** agente (exceto `learner`). Você não lê o perfil nem `lessons.md`: eles são para os agentes.
+- Raiz do repo = `$REPO`. Pasta do job = `$REPO/factory/jobs/<job-id>` (`$JOB`). Worktree do job = `$WTROOT/<job-id>` (`$WT`). Nunca trabalhe na raiz do repo, exceto para o merge final.
+- Leia `factory/config.sh` (limites, comandos e `FACTORY_PROFILE`) antes de começar. Você não lê o perfil nem `lessons.md`: eles são para os agentes.
+- Passe `$PROFILE`, `$GATES` e `$BASE` a **todo** agente (exceto `learner`).
+- Os agentes têm nomes curtos (`builder`, `reviewer-code`...). Instalada como plugin, a fábrica os expõe como `qubit:builder` etc. Use o nome que aparecer na sua lista de agentes.
+
+## Antes de qualquer comando: localizar a fábrica
+1. `$FACTORY_HOME` = raiz da fábrica, duas pastas acima do diretório desta skill (o "Base directory" que o Claude Code mostra ao carregá-la). Resolva links: `FACTORY_HOME="$(cd -P "<base directory>" && cd ../.. && pwd)"`.
+2. Exceto em `/qubit init`, rode `bash "$FACTORY_HOME/scripts/factory-gates.sh" info "$REPO"`.
+   - `INFO: ERRO`: mostre as linhas ao usuário e pare. Se faltar `factory/config.sh`, sugira `/qubit init`.
+   - `INFO`: guarde `$BASE` (linha `base:`), `$WTROOT` (`worktrees:`), `$PROFILE` (`profile_md:`) e `$GATES` (`gates:`). Não invente esses valores.
 - Responda ao usuário em português.
 
 ## Antes de começar: modelo da sessão
@@ -37,6 +45,7 @@ O seu contexto precisa durar o job inteiro, com várias rodadas. Por isso:
 
 | Comando | Ação |
 |---|---|
+| `/qubit init [perfil]` | Instala a fábrica no projeto atual (veja **Init**). Não roda job. |
 | `/qubit <desc>` | Novo job. Tipo inferido (feature, bug, refactor) ou forçado com `--bug` / `--refactor` / `--feature`. |
 | `/qubit next` | Pega o primeiro item `- [ ]` de `factory/backlog.md`, marca `- [~] <job-id>` e roda. |
 | `/qubit status` | Lista jobs (id, tipo, status, rodada, chamadas de agente). Só lê `job.json`. |
@@ -55,7 +64,7 @@ O seu contexto precisa durar o job inteiro, com várias rodadas. Por isso:
   "max_rounds": 2,
   "max_agent_calls": 20,
   "branch": "factory/003-login-biometrico",
-  "worktree": "../qubit-factory-factory/003-login-biometrico",
+  "worktree": "/caminho/meu-app-factory/003-login-biometrico",
   "reviewers": [],
   "events": [{"at": "ISO-8601", "agent": "builder", "model": "claude-opus-5-5", "effort": "high", "round": 1, "note": ""}]
 }
@@ -63,13 +72,19 @@ O seu contexto precisa durar o job inteiro, com várias rodadas. Por isso:
 
 Atualize `job.json` a cada transição. Cada chamada de agente vira um item em `events`. **Se `len(events) >= max_agent_calls`, pare**: status `needs-human`, motivo em `decision.md` escrito por você (primeira linha `ESCALATE`).
 
+## Init
+`/qubit init [perfil]` prepara o projeto atual para a fábrica. Não cria job nem worktree.
+1. Rode `bash "$FACTORY_HOME/scripts/factory-init.sh" "$REPO" [perfil]`. Sem perfil, o script detecta a stack.
+2. Mostre a saída como veio. Ela lista o que foi criado, o que já existia (nunca sobrescreve) e o resultado do `info`.
+3. Diga ao usuário o que falta ser feito por uma pessoa: preencher as seções `_preencher_` do `CLAUDE.md`, revisar `factory/config.sh` (no `ios`, `FACTORY_SCHEME`) e fazer commit desses arquivos na branch base antes do primeiro job (o worktree nasce da branch base, então a config precisa estar commitada).
+
 ## O loop
 
 ### 1. INIT
 1. Calcule o próximo número `NNN` (maior prefixo em `factory/jobs/` + 1) e um slug curto. `id = NNN-slug`.
 2. Crie `factory/jobs/<id>/` e o `job.json`.
-3. Crie o worktree: `git worktree add -b factory/<id> ../qubit-factory-factory/<id> master`.
-4. Rode `bash scripts/factory-gates.sh baseline "$WT"` e guarde a saída em `baseline.md`. Isso registra o que já estava quebrado antes do job; o builder e os gates só respondem pelo que ele mudou.
+3. Crie o worktree: `git worktree add -b factory/<id> "$WTROOT/<id>" "$BASE"`.
+4. Rode `bash "$GATES" baseline "$WT"` e guarde a saída em `baseline.md`. Isso registra o que já estava quebrado antes do job; o builder e os gates só respondem pelo que ele mudou.
 
 ### 2. SPEC
 Spawne `spec-writer` (`claude-opus-5-5`). Entrada: descrição, tipo, caminho do job, `$WT`, `$PROFILE`. Saída: `spec.md`.
@@ -80,12 +95,12 @@ Spawne `builder` (`claude-opus-5-5`) com `cwd` = `$WT`. Entrada: `spec.md`, `les
 Na rodada de retrabalho, **retome o mesmo builder** (SendMessage) em vez de criar outro.
 
 ### 4. GATES (determinístico, sem LLM)
-Rode `bash scripts/factory-gates.sh run "$WT" > "$JOB/round-<n>/gates.md" 2>&1` (em background se puder passar de 10 min) e leia só `head -1` (`GATES: PASS` ou `GATES: FAIL`).
+Rode `bash "$GATES" run "$WT" > "$JOB/round-<n>/gates.md" 2>&1` (em background se puder passar de 10 min) e leia só `head -1` (`GATES: PASS` ou `GATES: FAIL`).
 - `FAIL`: não gaste revisores. Conte como rodada e volte ao BUILD com o `gates.md`.
 - `PASS`: siga para REVIEW.
 
 ### 5. REVIEW
-Decida os revisores. Para saber se o diff toca interface, rode `bash scripts/factory-gates.sh ui "$WT" | head -1` (`UI: yes` ou `UI: no`); quais arquivos contam como interface é definido pelo perfil, não por você.
+Decida os revisores. Para saber se o diff toca interface, rode `bash "$GATES" ui "$WT" | head -1` (`UI: yes` ou `UI: no`); quais arquivos contam como interface é definido pelo perfil, não por você.
 
 | Revisor | Quando roda | Modelo |
 |---|---|---|
@@ -111,8 +126,8 @@ Antes de aceitar `APPROVE`, rode os gates **de novo** no estado final (`> "$JOB/
 Em `ESCALATE`, mostre ao usuário só a seção `## Motivo` (`sed -n '/^## Motivo/,$p'`).
 
 ### 8. MERGE (só com `APPROVE`)
-1. Na raiz do repo, em `master` limpa: `git merge --no-ff factory/<id> -m "feat(<id>): <title>"`. O prefixo segue o tipo (`feat`, `fix`, `refactor`) e o título vai em inglês, no imperativo (traduza o título do spec se preciso).
-2. **Conflito:** `git merge --abort`, uma tentativa de `git rebase master` dentro de `$WT` feita pelo builder (retome-o), gates de novo e tente o merge uma segunda vez. Se falhar de novo: `needs-human`, sem forçar nada.
+1. Na raiz do repo, em `$BASE` limpa: `git merge --no-ff factory/<id> -m "feat(<id>): <title>"`. O prefixo segue o tipo (`feat`, `fix`, `refactor`) e o título vai em inglês, no imperativo (traduza o título do spec se preciso).
+2. **Conflito:** `git merge --abort`, uma tentativa de `git rebase "$BASE"` dentro de `$WT` feita pelo builder (retome-o), gates de novo e tente o merge uma segunda vez. Se falhar de novo: `needs-human`, sem forçar nada.
 3. Sucesso: status `merged`, remova o worktree (`git worktree remove`), marque `- [x]` no backlog se veio de `next`.
 
 ### 9. APRENDER

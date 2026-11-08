@@ -1,12 +1,15 @@
-# Configuração da fábrica. Lido por scripts/factory-gates.sh e pelo orquestrador.
+# Configuração da fábrica. Lida pelos gates (factory-gates.sh) e pelo orquestrador.
 # Sem um comando de teste (aqui ou detectado pelo perfil), os gates FALHAM de propósito
 # (um gate que passa sem rodar nada é pior do que nenhum gate).
 
 # --- Perfil de stack ---
-# Um de factory/profiles/: ios, android, web, python, generic.
-# O perfil traz os comandos padrão (factory/profiles/<perfil>.sh) e as convenções e checklists
-# que os agentes seguem (factory/profiles/<perfil>.md).
+# Um dos perfis do plugin (profiles/): ios, android, web, python, generic.
+# O perfil traz os comandos padrão (<perfil>.sh) e as convenções e checklists que os agentes seguem (<perfil>.md).
+# Para customizar, crie factory/profiles/<perfil>.sh e .md neste projeto: eles vencem os do plugin.
 FACTORY_PROFILE="ios"
+
+# --- Repositório ---
+FACTORY_BASE_BRANCH="master"            # onde a fábrica cria os worktrees e faz o merge; vazio = origin/HEAD, master ou main
 
 # --- Comandos dos gates (vazio = usa o padrão detectado pelo perfil) ---
 # Cada comando roda com `bash -c` na raiz do worktree.

@@ -51,19 +51,20 @@ INIT (worktree + baseline) -> SPEC -> BUILD -> GATES --FAIL--> BUILD
 
 ## Garantias e controles
 
-- **Gates sem LLM** (`scripts/factory-gates.sh`): segredos no diff, preparação, lint/formato/tipos, build e testes, com os comandos do perfil ou da config. Falha de gate volta ao builder **sem gastar revisores**. Sem comando de teste, os gates falham de propósito.
+- **Gates sem LLM** (`plugins/qubit/scripts/factory-gates.sh`): segredos no diff, preparação, lint/formato/tipos, build e testes, com os comandos do perfil ou da config. Falha de gate volta ao builder **sem gastar revisores**. Sem comando de teste, os gates falham de propósito.
 - **Revisores de UI/UX por perfil:** `factory-gates.sh ui <wt>` responde `UI: yes|no` a partir das regex do perfil; o orquestrador não adivinha quais arquivos são interface.
 - **Baseline:** o estado antes do job é registrado; o builder só responde pelo que piorou.
 - **Revisores independentes:** não leem `build.md`; rodam o código e conferem o diff.
 - **Tipos de job:** bug exige teste que falha antes e passa depois; refactor exige caracterização antes e proíbe alterar testes existentes.
 - **Custo:** `max_rounds` e `max_agent_calls` por job (`factory/config.sh`), registro de cada chamada em `job.json`.
-- **Guarda** (`.claude/hooks/guard.sh`): bloqueia `git push`, `rm -rf` amplo e edição de gates/hooks/config/perfis dentro de worktrees.
+- **Guarda** (`plugins/qubit/hooks/guard.sh`): bloqueia `git push`, `rm -rf` amplo e edição de gates/hooks/config/perfis dentro de worktrees.
 - **Resiliência:** revisor sem arquivo válido roda de novo uma vez, depois escala; conflito de merge tem uma tentativa de rebase, depois escala.
 - **Contexto do orquestrador:** cada agente termina com um bloco `RELATÓRIO` de até 15 linhas; o orquestrador decide por ele e pela primeira linha dos arquivos, sem ler spec, build, reviews nem decision inteiros. Ele também não manda mensagens de "já acabou?" para agentes em andamento.
 - **Saída de build fora do contexto:** agentes com `Bash` usam `factory-gates.sh` (que resume) ou redirecionam build e teste para `factory/jobs/<id>/logs/` e leem só com `rg`, usando o padrão da seção `## Logs` do perfil.
 - **Memória:** achados repetidos em 2+ jobs viram linha em `lessons.md` (o `learner` propõe, o orquestrador grava).
-- **Autoteste:** `bash scripts/factory-selftest.sh` valida agentes, perfis, formatos de veredito, hook e gates sem gastar nenhuma chamada de LLM. Rode depois de mexer em qualquer prompt.
-- **Estado:** `factory/jobs/` é local e ignorado pelo git; worktrees ficam em `../qubit-factory-factory/`.
+- **Autoteste:** `bash plugins/qubit/scripts/factory-selftest.sh` valida agentes, perfis, formatos de veredito, hook e gates sem gastar nenhuma chamada de LLM. Rode depois de mexer em qualquer prompt.
+- **Estado:** `factory/jobs/` é local e ignorado pelo git; worktrees ficam em `../<repo>-factory/`.
+- **Plugin:** o código da fábrica fica em `plugins/qubit/`; o projeto guarda só `factory/` e a seção do `CLAUDE.md`. Para outro projeto: instale o plugin e rode `/qubit init` (detalhes no `README.md` da raiz).
 
 ## Limites conhecidos
 

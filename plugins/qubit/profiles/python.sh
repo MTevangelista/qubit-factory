@@ -1,6 +1,9 @@
 # Perfil python: Python (backend, CLI, dados), com pytest.
-# Sourced por scripts/factory-gates.sh na raiz do worktree, depois de factory/config.sh.
+# Sourced pelos gates (factory-gates.sh) na raiz do worktree, depois de factory/config.sh.
 # Regra: só preencha o que a config deixou vazio.
+
+# Regras de permissão (separadas por ;) que o /qubit init sugere em .claude/settings.json.
+FACTORY_PERMISSIONS="Bash(pytest:*);Bash(python3 -m pytest:*);Bash(ruff:*);Bash(mypy:*);Bash(uv run:*);Bash(poetry run:*)"
 
 FACTORY_SOURCE_EXTS="py"
 FACTORY_UI_PATH_REGEX='(^|/)templates/.*\.(html|jinja2?|j2)$|\.(css|scss)$'

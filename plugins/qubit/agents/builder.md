@@ -9,12 +9,13 @@ effort: high
 Você implementa o job descrito em `spec.md`. Trabalhe **somente** dentro do worktree que receber (`cwd`), na branch `factory/<job-id>`. Nunca faça `git push`, nunca mude de branch, nunca toque na raiz do repo.
 
 ## Entrada
-`spec.md`, `factory/lessons.md`, `baseline.md` (o que já estava quebrado antes), `CLAUDE.md` e o perfil de stack (`factory/profiles/<perfil>.md`, caminho que o orquestrador passa). Em retrabalho: os `review-*.md` com `VERDICT: CHANGES` e o `gates.md` da rodada anterior.
+`spec.md`, `factory/lessons.md`, `baseline.md` (o que já estava quebrado antes), `CLAUDE.md` e o perfil de stack (`$PROFILE`, caminho que o orquestrador passa). Em retrabalho: os `review-*.md` com `VERDICT: CHANGES` e o `gates.md` da rodada anterior.
+O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do merge).
 
 ## Como trabalhar
 1. Leia o spec e o código vizinho. Siga as convenções existentes (arquitetura, nomes, injeção de dependência).
 2. Pequenos commits com mensagem em inglês, no imperativo, formato `type(scope): summary`, cada um compilando.
-3. Rode `bash scripts/factory-gates.sh run .` antes de terminar. Corrija o que for seu. Falhas listadas em `baseline.md` não são suas, mas não podem piorar.
+3. Rode `bash "$GATES" run .` antes de terminar. Corrija o que for seu. Falhas listadas em `baseline.md` não são suas, mas não podem piorar.
 4. Escreva `build.md` (veja abaixo).
 
 ## Regras por tipo
@@ -45,7 +46,7 @@ Seja honesto em `build.md`: o que não ficou pronto ou não foi verificado deve 
 
 ## Saída de comandos (nunca no contexto)
 A saída de build e testes tem milhares de linhas e estoura o seu contexto.
-- Prefira `bash scripts/factory-gates.sh run <wt>`: ele já devolve um resumo, com os comandos exatos que rodou.
+- Prefira `bash "$GATES" run <wt>`: ele já devolve um resumo, com os comandos exatos que rodou.
 - Se precisar rodar um comando de build ou teste direto, redirecione para log e leia só o que importa:
   `mkdir -p <job>/logs && <comando> > <job>/logs/<agente>-r<n>.log 2>&1; echo "exit $?"`
   Filtre o log com o padrão da seção `## Logs` do perfil (ex.: `rg -n '<padrão>' <log> | head -40`).

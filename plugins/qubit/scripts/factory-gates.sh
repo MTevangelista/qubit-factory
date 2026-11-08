@@ -2,20 +2,25 @@
 # Gates determinísticos da fábrica (sem LLM), independentes de linguagem.
 #
 # Uso:
-#   scripts/factory-gates.sh run      <dir-do-worktree>   # PASS/FAIL; falha se algo quebrar
-#   scripts/factory-gates.sh baseline <dir-do-worktree>   # só registra o estado inicial; sai sempre 0
-#   scripts/factory-gates.sh ui       <dir-do-worktree>   # "UI: yes" | "UI: no" (o diff toca interface?)
+#   factory-gates.sh run      <dir-do-worktree>   # PASS/FAIL; falha se algo quebrar
+#   factory-gates.sh baseline <dir-do-worktree>   # só registra o estado inicial; sai sempre 0
+#   factory-gates.sh ui       <dir-do-worktree>   # "UI: yes" | "UI: no" (o diff toca interface?)
+#   factory-gates.sh info     <raiz-do-repo>      # caminhos e branch que o orquestrador usa; sai 1 se a config estiver errada
 #
-# Os comandos vêm de factory/config.sh; o que estiver vazio lá recebe o padrão do perfil
-# (factory/profiles/<FACTORY_PROFILE>.sh). Saída em markdown no stdout.
-# Primeira linha: "GATES: PASS" | "GATES: FAIL" (run), "BASELINE" (baseline) ou "UI: ..." (ui).
+# Os comandos vêm de factory/config.sh do projeto; o que estiver vazio lá recebe o padrão do perfil.
+# Perfil: factory/profiles/<FACTORY_PROFILE>.sh do projeto, se existir; senão o do plugin (profiles/).
+# Saída em markdown no stdout.
+# Primeira linha: "GATES: PASS" | "GATES: FAIL" (run), "BASELINE" (baseline), "UI: ..." (ui) ou "INFO" | "INFO: ERRO" (info).
 # Código de saída: 0 = PASS, 1 = FAIL.
 set -u -o pipefail
 
+# Raiz da fábrica (plugin): a pasta acima de scripts/.
+FACTORY_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 MODE="${1:-}"
 DIR="${2:-}"
-if [[ "$MODE" != "run" && "$MODE" != "baseline" && "$MODE" != "ui" ]] || [[ -z "$DIR" ]]; then
-  echo "uso: $0 run|baseline|ui <dir>" >&2
+if [[ "$MODE" != "run" && "$MODE" != "baseline" && "$MODE" != "ui" && "$MODE" != "info" ]] || [[ -z "$DIR" ]]; then
+  echo "uso: $0 run|baseline|ui|info <dir>" >&2
   exit 2
 fi
 cd "$DIR" || { echo "GATES: FAIL"; echo "diretório inexistente: $DIR"; exit 1; }
@@ -30,11 +35,13 @@ fail()    { printf -- '- FALHOU: %s\n' "$1" >>"$BODY"; FAILED=1; }
 skip()    { printf -- '- PULADO: %s\n' "$1" >>"$BODY"; }
 
 # ---------------------------------------------------------------- config + perfil
-# Config do repo-fonte: no worktree ela vem versionada em factory/config.sh.
+# Config do projeto: no worktree ela vem versionada em factory/config.sh.
 CONFIG="factory/config.sh"
+HAS_CONFIG=0
 # shellcheck disable=SC1090
-[[ -f "$CONFIG" ]] && source "$CONFIG"
+[[ -f "$CONFIG" ]] && { source "$CONFIG"; HAS_CONFIG=1; }
 : "${FACTORY_PROFILE:=generic}"
+: "${FACTORY_BASE_BRANCH:=}"
 : "${GATE_TIMEOUT_SECONDS:=1800}"
 : "${FACTORY_ALLOW_NO_PROJECT:=0}"
 : "${FACTORY_REQUIRE_TOOLS:=0}"
@@ -43,17 +50,60 @@ FACTORY_SOURCE_EXTS=""
 FACTORY_UI_PATH_REGEX=""
 FACTORY_UI_CONTENT_REGEX=""
 
-PROFILE_SH="factory/profiles/$FACTORY_PROFILE.sh"
-if [[ -f "$PROFILE_SH" ]]; then
+# Perfil do projeto vence o do plugin (permite customizar sem fork).
+profile_file() { # profile_file <ext>
+  if [[ -f "factory/profiles/$FACTORY_PROFILE.$1" ]]; then echo "$PWD/factory/profiles/$FACTORY_PROFILE.$1"
+  elif [[ -f "$FACTORY_HOME/profiles/$FACTORY_PROFILE.$1" ]]; then echo "$FACTORY_HOME/profiles/$FACTORY_PROFILE.$1"; fi
+}
+PROFILE_SH="$(profile_file sh)"
+PROFILE_MD="$(profile_file md)"
+if [[ -n "$PROFILE_SH" ]]; then
   # O perfil só preenche o que a config deixou vazio.
   # shellcheck disable=SC1090
   source "$PROFILE_SH"
 else
-  FACTORY_PROFILE_ERROR="perfil '$FACTORY_PROFILE' não existe ($PROFILE_SH); veja factory/profiles/"
+  FACTORY_PROFILE_ERROR="perfil '$FACTORY_PROFILE' não existe (nem em factory/profiles/ nem em $FACTORY_HOME/profiles/)"
 fi
 
-BASE_REF="master"
-git rev-parse --verify -q "$BASE_REF" >/dev/null || BASE_REF="main"
+# Branch base: a da config; vazio = origin/HEAD, depois master, depois main.
+detect_base() {
+  local b
+  b="$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null)"; b="${b#origin/}"
+  if [[ -n "$b" ]] && git rev-parse --verify -q "refs/heads/$b" >/dev/null; then echo "$b"; return; fi
+  for b in master main; do
+    git rev-parse --verify -q "refs/heads/$b" >/dev/null && { echo "$b"; return; }
+  done
+  echo "master"
+}
+BASE_REF="${FACTORY_BASE_BRANCH:-$(detect_base)}"
+
+# ---------------------------------------------------------------- modo info
+if [[ "$MODE" == "info" ]]; then
+  ERR=()
+  REPO="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+  if [[ -z "$REPO" ]]; then
+    ERR+=("$DIR não é um repositório git")
+  else
+    REPO="$(dirname "$REPO")"
+    [[ "$(git rev-parse --show-toplevel)" == "$REPO" ]] || ERR+=("rode o info na raiz do repo ($REPO), não num worktree")
+  fi
+  [[ $HAS_CONFIG -eq 1 ]] || ERR+=("factory/config.sh não existe; rode /qubit init")
+  [[ -n "$FACTORY_PROFILE_ERROR" ]] && ERR+=("$FACTORY_PROFILE_ERROR")
+  [[ -n "$PROFILE_SH" && -z "$PROFILE_MD" ]] && ERR+=("perfil '$FACTORY_PROFILE' sem o .md de convenções")
+  git rev-parse --verify -q "refs/heads/$BASE_REF" >/dev/null || ERR+=("branch base '$BASE_REF' não existe (ajuste FACTORY_BASE_BRANCH em factory/config.sh)")
+  if [[ ${#ERR[@]} -gt 0 ]]; then
+    echo "INFO: ERRO"; printf -- '- %s\n' "${ERR[@]}"; exit 1
+  fi
+  echo "INFO"
+  echo "repo: $REPO"
+  echo "base: $BASE_REF"
+  echo "worktrees: $(dirname "$REPO")/$(basename "$REPO")-factory"
+  echo "profile: $FACTORY_PROFILE"
+  echo "profile_md: $PROFILE_MD"
+  echo "gates: $FACTORY_HOME/scripts/factory-gates.sh"
+  echo "factory_home: $FACTORY_HOME"
+  exit 0
+fi
 
 # ---------------------------------------------------------------- modo ui
 if [[ "$MODE" == "ui" ]]; then
@@ -123,7 +173,7 @@ optional_tool() {
   run_cmd "$label" "$cmd"
 }
 
-printf -- '- Perfil: `%s`\n' "$FACTORY_PROFILE" >>"$BODY"
+printf -- '- Perfil: `%s` (%s)\n- Branch base: `%s`\n' "$FACTORY_PROFILE" "${PROFILE_SH:-ausente}" "$BASE_REF" >>"$BODY"
 
 # ---------------------------------------------------------------- 0. perfil
 if [[ -n "$FACTORY_PROFILE_ERROR" ]]; then

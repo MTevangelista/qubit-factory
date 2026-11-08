@@ -1,6 +1,9 @@
 # Perfil ios: Swift / SwiftUI, Xcode ou Swift Package.
-# Sourced por scripts/factory-gates.sh na raiz do worktree, depois de factory/config.sh.
+# Sourced pelos gates (factory-gates.sh) na raiz do worktree, depois de factory/config.sh.
 # Regra: só preencha o que a config deixou vazio.
+
+# Regras de permissão (separadas por ;) que o /qubit init sugere em .claude/settings.json.
+FACTORY_PERMISSIONS="Bash(xcodebuild:*);Bash(swift build:*);Bash(swift test:*);Bash(swiftlint:*);Bash(swift-format:*)"
 
 FACTORY_SOURCE_EXTS="swift"
 FACTORY_UI_PATH_REGEX='\.(xcassets|storyboard|xib|strings|xcstrings)(/|$)'

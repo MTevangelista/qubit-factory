@@ -145,7 +145,7 @@
   <!-- 8 MERGE -->
   <rect x="250" y="1110" width="300" height="68" rx="10" class="step"/>
   <text x="400" y="1134" class="t" text-anchor="middle">8 · MERGE local</text>
-  <text x="400" y="1153" class="s" text-anchor="middle">git merge --no-ff na master</text>
+  <text x="400" y="1153" class="s" text-anchor="middle">git merge --no-ff na branch base</text>
   <text x="400" y="1170" class="s" text-anchor="middle">nunca há git push</text>
 
   <line x1="550" y1="1144" x2="688" y2="1144" class="e"/>

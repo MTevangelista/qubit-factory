@@ -1,6 +1,6 @@
 # Perfil: generic
 
-Perfil sem suposição de linguagem. Use quando nenhum outro servir; as convenções vêm do `CLAUDE.md` do projeto e os comandos de `factory/config.sh` (`FACTORY_TEST_CMD` é obrigatório). Para uma stack que vai se repetir, prefira criar um perfil próprio (veja `factory/profiles/README.md`).
+Perfil sem suposição de linguagem. Use quando nenhum outro servir; as convenções vêm do `CLAUDE.md` do projeto e os comandos de `factory/config.sh` (`FACTORY_TEST_CMD` é obrigatório). Para uma stack que vai se repetir, prefira criar um perfil próprio (veja `plugins/qubit/profiles/README.md`).
 
 ## Stack
 Definida pelo `CLAUDE.md` do projeto. Leia-o antes de qualquer coisa.

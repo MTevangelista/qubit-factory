@@ -1,6 +1,9 @@
 # Perfil web: JavaScript / TypeScript (React, Vue, Svelte, Node...), via package.json.
-# Sourced por scripts/factory-gates.sh na raiz do worktree, depois de factory/config.sh.
+# Sourced pelos gates (factory-gates.sh) na raiz do worktree, depois de factory/config.sh.
 # Regra: só preencha o que a config deixou vazio. Os comandos vêm dos scripts do package.json.
+
+# Regras de permissão (separadas por ;) que o /qubit init sugere em .claude/settings.json.
+FACTORY_PERMISSIONS="Bash(npm run:*);Bash(npm ci:*);Bash(pnpm run:*);Bash(yarn run:*);Bash(npx --no-install tsc:*)"
 
 FACTORY_SOURCE_EXTS="ts tsx js jsx mjs cjs vue svelte"
 FACTORY_UI_PATH_REGEX='\.(tsx|jsx|vue|svelte|astro|css|scss|sass|less|html)$'
