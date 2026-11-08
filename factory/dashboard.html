@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Software Factory</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --mut:#666; --card:#f5f5f7; --bd:#ddd;
+          --ok:#1a7f37; --warn:#9a6700; --bad:#cf222e; --run:#0969da; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111; --fg:#eee; --mut:#999; --card:#1c1c1e; --bd:#333;
+            --ok:#3fb950; --warn:#d29922; --bad:#f85149; --run:#58a6ff; } }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg); font:14px/1.45 -apple-system,system-ui,sans-serif; }
+  h1 { font-size:18px; margin:0 0 4px; } .sub { color:var(--mut); margin-bottom:16px; }
+  #board { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:12px; }
+  .card h2 { font-size:14px; margin:0 0 6px; word-break:break-word; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px; border:1px solid currentColor; }
+  .merged,.APPROVE,.PASS { color:var(--ok); } .needs-human,.failed,.CHANGES,.ESCALATE { color:var(--bad); }
+  .building,.reviewing,.gates,.approving,.spec { color:var(--run); }
+  .row { margin:6px 0; color:var(--mut); } .row b { color:var(--fg); font-weight:600; }
+  .rev span { margin-right:6px; }
+  details { margin-top:8px; } summary { cursor:pointer; color:var(--mut); }
+  pre { white-space:pre-wrap; background:var(--bg); border:1px solid var(--bd); border-radius:6px; padding:8px; max-height:260px; overflow:auto; font-size:12px; }
+  .err { color:var(--bad); }
+</style>
+</head>
+<body>
+<h1>Software Factory</h1>
+<div class="sub" id="meta">Servir com: <code>python3 -m http.server -d factory 8000</code></div>
+<div id="board"></div>
+<script>
+const $ = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+const get = async (u) => { const r = await fetch(u, {cache:'no-store'}); if (!r.ok) throw new Error(u + ' ' + r.status); return r; };
+const verdict = (t) => (t.split('\n', 1)[0] || '').replace('VERDICT:', '').trim();
+
+async function jobIds() {
+  const html = await (await get('jobs/')).text();
+  return [...html.matchAll(/href="([^"?#]+)\/"/g)].map(m => decodeURIComponent(m[1])).filter(x => !x.startsWith('.')).sort();
+}
+
+async function card(id) {
+  const c = $('div', 'card'); const h = $('h2', null, id); c.append(h);
+  let job;
+  try { job = await (await get(`jobs/${id}/job.json`)).json(); } catch { c.append($('div', 'err', 'job.json ausente ou inválido')); return c; }
+  h.append(' ', $('span', 'pill ' + job.status, job.status));
+  c.append($('div', 'row', job.title || ''));
+  const r = $('div', 'row'); r.append('tipo ', $('b', null, job.type), ' · rodada ', $('b', null, `${job.round}/${job.max_rounds}`),
+    ' · chamadas ', $('b', null, `${(job.events || []).length}/${job.max_agent_calls}`)); c.append(r);
+
+  const round = Math.max(1, job.round || 1);
+  const rv = $('div', 'row rev');
+  for (const name of (job.reviewers || [])) {
+    let v = '…'; try { v = verdict(await (await get(`jobs/${id}/round-${round}/review-${name}.md`)).text()) || '?'; } catch {}
+    const s = $('span'); s.append(name + ' ', $('span', 'pill ' + v, v)); rv.append(s);
+  }
+  if (rv.children.length) c.append(rv);
+  try { const g = verdict((await (await get(`jobs/${id}/round-${round}/gates.md`)).text()).replace('GATES:', 'VERDICT:'));
+        const gr = $('div', 'row'); gr.append('gates ', $('span', 'pill ' + g, g)); c.append(gr); } catch {}
+  try { const d = (await (await get(`jobs/${id}/decision.md`)).text()).split('\n', 1)[0].trim();
+        const dr = $('div', 'row'); dr.append('decisão ', $('span', 'pill ' + d, d)); c.append(dr); } catch {}
+
+  const files = ['spec.md', 'build.md', 'decision.md', 'baseline.md'];
+  for (const f of files) {
+    const d = $('details'); d.append($('summary', null, f)); const pre = $('pre', null, 'carregando…'); d.append(pre);
+    d.addEventListener('toggle', async () => { if (d.open) try { pre.textContent = await (await get(`jobs/${id}/${f}`)).text(); } catch { pre.textContent = '(não existe ainda)'; } });
+    c.append(d);
+  }
+  return c;
+}
+
+async function refresh() {
+  const open = new Set([...document.querySelectorAll('details[open]')].map(d => d.closest('.card').firstChild.textContent + '/' + d.firstChild.textContent));
+  try {
+    const ids = await jobIds(); const frag = document.createDocumentFragment();
+    for (const id of ids) frag.append(await card(id));
+    const board = document.getElementById('board'); board.replaceChildren(frag);
+    if (!ids.length) board.append($('div', 'sub', 'Nenhum job ainda. Rode /factory <descrição>.'));
+    board.querySelectorAll('.card').forEach(cd => cd.querySelectorAll('details').forEach(d => {
+      if (open.has(cd.firstChild.firstChild.textContent + '/' + d.firstChild.textContent)) { d.open = true; d.dispatchEvent(new Event('toggle')); } }));
+    document.getElementById('meta').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR') + ' · a cada 2 s';
+  } catch (e) { document.getElementById('meta').textContent = 'Erro: ' + e.message + ' (sirva a pasta factory/ com http.server)'; }
+}
+refresh(); setInterval(refresh, 2000);
+</script>
+</body>
+</html>

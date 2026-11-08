@@ -33,8 +33,9 @@ case "$TOOL" in
   Edit|Write|NotebookEdit)
     FILE="$(read_field tool_input.file_path)"
     # Só vale dentro de worktrees da fábrica (diretório "<repo>-factory/<job-id>/...").
-    if [[ "$FILE" == *-factory/* ]]; then
-      REL="${FILE#*-factory/*/}"
+    # O repo se chama qubit-factory, então exige o diretório de job (NNN-slug) logo após "-factory/".
+    if [[ "$FILE" =~ -factory/[0-9]{3}-[^/]+/(.*)$ ]]; then
+      REL="${BASH_REMATCH[1]}"
       case "$REL" in
         .claude/*|scripts/factory-*|factory/config.sh|factory/lessons.md|CLAUDE.md)
           block "agentes não podem alterar $REL (gates, hooks, config e regras são do humano)." ;;
