@@ -37,7 +37,7 @@ case "$TOOL" in
     if [[ "$FILE" =~ -factory/[0-9]{3}-[^/]+/(.*)$ ]]; then
       REL="${BASH_REMATCH[1]}"
       case "$REL" in
-        .claude/*|scripts/factory-*|factory/config.sh|factory/lessons.md|CLAUDE.md)
+        .claude/*|scripts/factory-*|factory/config.sh|factory/profiles/*|factory/lessons.md|CLAUDE.md)
           block "agentes não podem alterar $REL (gates, hooks, config e regras são do humano)." ;;
       esac
     fi

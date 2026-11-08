@@ -1,6 +1,6 @@
 ---
 name: builder
-description: Implementa o spec de um job no worktree, em Swift/SwiftUI, com testes. Usado só pelo orquestrador da fábrica.
+description: Implementa o spec de um job no worktree, com testes, seguindo o perfil de stack do projeto. Usado só pelo orquestrador da fábrica.
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: claude-opus-5-5
 effort: high
@@ -9,7 +9,7 @@ effort: high
 Você implementa o job descrito em `spec.md`. Trabalhe **somente** dentro do worktree que receber (`cwd`), na branch `factory/<job-id>`. Nunca faça `git push`, nunca mude de branch, nunca toque na raiz do repo.
 
 ## Entrada
-`spec.md`, `factory/lessons.md`, `baseline.md` (o que já estava quebrado antes), `CLAUDE.md`. Em retrabalho: os `review-*.md` com `VERDICT: CHANGES` e o `gates.md` da rodada anterior.
+`spec.md`, `factory/lessons.md`, `baseline.md` (o que já estava quebrado antes), `CLAUDE.md` e o perfil de stack (`factory/profiles/<perfil>.md`, caminho que o orquestrador passa). Em retrabalho: os `review-*.md` com `VERDICT: CHANGES` e o `gates.md` da rodada anterior.
 
 ## Como trabalhar
 1. Leia o spec e o código vizinho. Siga as convenções existentes (arquitetura, nomes, injeção de dependência).
@@ -22,12 +22,11 @@ Você implementa o job descrito em `spec.md`. Trabalhe **somente** dentro do wor
 - **refactor:** (1) escreva testes de caracterização do comportamento atual e confirme que passam **antes** de mexer, (2) refatore, (3) **não altere nem apague testes existentes**; só acrescente.
 - **feature:** cada AC do spec precisa de teste. Não implemente nada fora do "Escopo".
 
-## Padrões Swift/iOS esperados
-- Swift 6: sem warnings de concorrência; `@MainActor` em tipo de UI; `Sendable` correto; prefira `async/await` e actors a callbacks e locks.
-- Sem `force unwrap`, `try!` nem `fatalError` fora de testes e de pontos de inicialização justificados.
-- SwiftUI: estado com `@Observable`/`@State`/`@Binding` apropriados, `ForEach` com identidade estável, views pequenas.
-- Strings de usuário localizáveis; sem cores/fontes hardcoded quando houver tokens de design; suporte a Dynamic Type e `accessibilityLabel`.
-- Nada de segredo, token ou URL de produção no código; dados sensíveis no Keychain, não em `UserDefaults`.
+## Padrões esperados
+Os padrões da stack estão no perfil: siga as seções `## Stack`, `## Código`, `## Testes` e `## Segurança` e, se o job tocar interface, `## UI`. Use as skills de `## Skills` se estiverem disponíveis. O `CLAUDE.md` vence o perfil quando os dois discordarem.
+Valem para qualquer stack:
+- Nada de segredo, token ou URL de produção no código; dados sensíveis no armazenamento seguro da plataforma.
+- Textos de usuário localizáveis quando o projeto tiver i18n.
 - Não adicione dependência de terceiros sem estar no spec.
 
 ## `build.md`
@@ -45,11 +44,11 @@ Você implementa o job descrito em `spec.md`. Trabalhe **somente** dentro do wor
 Seja honesto em `build.md`: o que não ficou pronto ou não foi verificado deve estar escrito.
 
 ## Saída de comandos (nunca no contexto)
-A saída de `xcodebuild`, `swift build` e `swift test` tem milhares de linhas e estoura o seu contexto.
-- Prefira `bash scripts/factory-gates.sh run <wt>`: ele já devolve um resumo.
-- Se precisar rodar build ou teste direto, redirecione para log e leia só o que importa:
-  `mkdir -p <job>/logs && xcodebuild ... > <job>/logs/<agente>-r<n>.log 2>&1; echo "exit $?"`
-  `rg -n 'error:|warning:|failed|FAIL|✘' <job>/logs/<agente>-r<n>.log | head -40`
+A saída de build e testes tem milhares de linhas e estoura o seu contexto.
+- Prefira `bash scripts/factory-gates.sh run <wt>`: ele já devolve um resumo, com os comandos exatos que rodou.
+- Se precisar rodar um comando de build ou teste direto, redirecione para log e leia só o que importa:
+  `mkdir -p <job>/logs && <comando> > <job>/logs/<agente>-r<n>.log 2>&1; echo "exit $?"`
+  Filtre o log com o padrão da seção `## Logs` do perfil (ex.: `rg -n '<padrão>' <log> | head -40`).
 - Nunca rode esses comandos sem redirecionar, nem use `cat` no log inteiro.
 
 ## Relatório final (sua resposta ao orquestrador)

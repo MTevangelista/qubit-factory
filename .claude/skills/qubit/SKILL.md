@@ -1,6 +1,6 @@
 ---
 name: qubit
-description: Software factory para o projeto iOS (Swift). Use para rodar um job completo (spec, build, gates, revisão, aprovação, merge) de uma feature, bug ou refactor. Comandos - /qubit <descrição>, /qubit --bug|--refactor <descrição>, /qubit next, /qubit status, /qubit approve <job-id>, /qubit rework <job-id> <nota>.
+description: Software factory independente de linguagem (a stack vem do perfil em factory/config.sh). Use para rodar um job completo (spec, build, gates, revisão, aprovação, merge) de uma feature, bug ou refactor. Comandos - /qubit <descrição>, /qubit --bug|--refactor <descrição>, /qubit next, /qubit status, /qubit approve <job-id>, /qubit rework <job-id> <nota>.
 ---
 
 # Orquestrador da fábrica
@@ -11,7 +11,7 @@ Regras gerais:
 
 - Estado vive em arquivos em `factory/jobs/<job-id>/`, nunca na conversa. Passe aos agentes **caminhos**, não resumos.
 - Raiz do repo = `$REPO`. Pasta do job = `$REPO/factory/jobs/<job-id>` (`$JOB`). Worktree do job = `../qubit-factory-factory/<job-id>` (`$WT`). Nunca trabalhe na raiz do repo, exceto para o merge final.
-- Leia `factory/config.sh` (limites e comandos) antes de começar. `lessons.md` é para os agentes; você não precisa lê-lo.
+- Leia `factory/config.sh` (limites, comandos e `FACTORY_PROFILE`) antes de começar. O perfil de stack é `$PROFILE` = `$REPO/factory/profiles/<FACTORY_PROFILE>.md`; se o arquivo não existir, pare e avise o usuário. Passe `$PROFILE` a **todo** agente (exceto `learner`). Você não lê o perfil nem `lessons.md`: eles são para os agentes.
 - Responda ao usuário em português.
 
 ## Antes de começar: modelo da sessão
@@ -23,7 +23,7 @@ O seu contexto precisa durar o job inteiro, com várias rodadas. Por isso:
 - **Nunca leia inteiro** `spec.md`, `build.md`, `gates.md`, `review-*.md` nem `decision.md`. Decida pela **primeira linha** (`head -1 <arquivo>`) e pelo **relatório final** que cada agente devolve (bloco `RELATÓRIO <agente>`, no máximo 15 linhas).
 - Leitura parcial permitida, só quando for mostrar algo ao usuário: uma seção por cabeçalho, com `sed -n '/^## Dúvidas bloqueantes/,/^## /p' <arquivo>` ou `sed -n '/^## Motivo/,$p' <arquivo>`.
 - Para passar achados ao builder, passe **caminhos** dos arquivos, nunca um resumo seu.
-- Saída de comandos longos (gates, build, teste) vai para arquivo; você lê só `head -1` ou um `rg` filtrado. Nunca deixe `xcodebuild` imprimir no seu contexto.
+- Saída de comandos longos (gates, build, teste) vai para arquivo; você lê só `head -1` ou um `rg` filtrado. Nunca deixe build ou teste imprimir no seu contexto.
 - Repasse ao usuário o relatório do agente como veio, sem reescrever.
 - Agente que não terminar com o bloco `RELATÓRIO`: confie só na primeira linha do arquivo. Se o arquivo também estiver malformado, aplique a regra de resiliência do passo correspondente.
 
@@ -72,11 +72,11 @@ Atualize `job.json` a cada transição. Cada chamada de agente vira um item em `
 4. Rode `bash scripts/factory-gates.sh baseline "$WT"` e guarde a saída em `baseline.md`. Isso registra o que já estava quebrado antes do job; o builder e os gates só respondem pelo que ele mudou.
 
 ### 2. SPEC
-Spawne `spec-writer` (`claude-opus-5-5`). Entrada: descrição, tipo, caminho do job, `$WT`. Saída: `spec.md`.
+Spawne `spec-writer` (`claude-opus-5-5`). Entrada: descrição, tipo, caminho do job, `$WT`, `$PROFILE`. Saída: `spec.md`.
 O spec deve ter critérios de aceitação numerados e verificáveis (`AC-1`, `AC-2`...). Se o relatório vier com `resultado: BLOQUEADO` (seção `## Dúvidas bloqueantes` não vazia), pare com status `needs-human` e mostre as dúvidas do relatório ao usuário. Não leia o spec para isso.
 
 ### 3. BUILD
-Spawne `builder` (`claude-opus-5-5`) com `cwd` = `$WT`. Entrada: `spec.md`, `lessons.md`, `baseline.md`, e na rodada > 1 os arquivos de `round-<n-1>/` e `gates.md`. Saída: commits em `factory/<id>` e `build.md`.
+Spawne `builder` (`claude-opus-5-5`) com `cwd` = `$WT`. Entrada: `spec.md`, `lessons.md`, `baseline.md`, `$PROFILE`, e na rodada > 1 os arquivos de `round-<n-1>/` e `gates.md`. Saída: commits em `factory/<id>` e `build.md`.
 Na rodada de retrabalho, **retome o mesmo builder** (SendMessage) em vez de criar outro.
 
 ### 4. GATES (determinístico, sem LLM)
@@ -85,17 +85,17 @@ Rode `bash scripts/factory-gates.sh run "$WT" > "$JOB/round-<n>/gates.md" 2>&1` 
 - `PASS`: siga para REVIEW.
 
 ### 5. REVIEW
-Decida os revisores a partir do diff (`git -C "$WT" diff --name-only master...HEAD`):
+Decida os revisores. Para saber se o diff toca interface, rode `bash scripts/factory-gates.sh ui "$WT" | head -1` (`UI: yes` ou `UI: no`); quais arquivos contam como interface é definido pelo perfil, não por você.
 
 | Revisor | Quando roda | Modelo |
 |---|---|---|
 | `reviewer-tests` | sempre | `claude-opus-5-5` |
 | `reviewer-code` | sempre | `claude-sonnet-5-5` |
 | `reviewer-security` | sempre | `claude-opus-5-5` |
-| `reviewer-ui` | diff toca `*.swift` com `import SwiftUI`/`UIKit`, `*.xcassets`, `*.storyboard`, `*.xib`, `*.strings`, `*.xcstrings` | `claude-sonnet-5-5` |
-| `reviewer-ux` | mesma condição do `reviewer-ui` e tipo ≠ refactor | `claude-sonnet-5-5` |
+| `reviewer-ui` | `UI: yes` | `claude-sonnet-5-5` |
+| `reviewer-ux` | `UI: yes` e tipo ≠ refactor | `claude-sonnet-5-5` |
 
-Grave a lista em `job.json.reviewers`. Spawne todos **em paralelo**, cada um escrevendo `round-<n>/review-<nome>.md`.
+Grave a lista em `job.json.reviewers`. Spawne todos **em paralelo**, cada um com `$PROFILE` na entrada e escrevendo `round-<n>/review-<nome>.md`.
 Os revisores **não leem `build.md`**: eles verificam o diff e rodam o código por conta própria.
 
 **Resiliência:** a rodada só está completa quando todos os arquivos da lista existem e começam com `VERDICT: PASS` ou `VERDICT: CHANGES` (confira com `head -1`, não lendo o arquivo). Arquivo ausente ou malformado: reexecute aquele revisor **uma vez**. Se falhar de novo, status `needs-human`.
@@ -106,7 +106,7 @@ Os revisores **não leem `build.md`**: eles verificam o diff e rodam o código p
 - Algum `CHANGES` e `round == max_rounds`: vá para APPROVE mesmo assim (o approver tende a `ESCALATE`).
 
 ### 7. APPROVE
-Spawne `approver` (`claude-opus-5-5`). Entrada: `spec.md`, todos os `round-*/`, `baseline.md`. Saída: `decision.md`, primeira linha `APPROVE` ou `ESCALATE` (leia com `head -1`).
+Spawne `approver` (`claude-opus-5-5`). Entrada: `spec.md`, todos os `round-*/`, `baseline.md`, `$PROFILE`. Saída: `decision.md`, primeira linha `APPROVE` ou `ESCALATE` (leia com `head -1`).
 Antes de aceitar `APPROVE`, rode os gates **de novo** no estado final (`> "$JOB/final-gates.md"`, só `head -1`). Se `FAIL`, trate como `ESCALATE`.
 Em `ESCALATE`, mostre ao usuário só a seção `## Motivo` (`sed -n '/^## Motivo/,$p'`).
 

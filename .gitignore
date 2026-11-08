@@ -28,6 +28,10 @@ DerivedData/
 .build/
 *.xcuserstate
 
+# Android / Gradle
+.gradle/
+local.properties
+
 # Software factory (estado local dos jobs; worktrees ficam fora do repo)
 factory/jobs/*
 !factory/jobs/.gitkeep
