@@ -1,11 +1,11 @@
 ---
-name: factory
-description: Software factory para o projeto iOS (Swift). Use para rodar um job completo (spec, build, gates, revisão, aprovação, merge) de uma feature, bug ou refactor. Comandos - /factory <descrição>, /factory --bug|--refactor <descrição>, /factory next, /factory status, /factory approve <job-id>, /factory rework <job-id> <nota>.
+name: qubit
+description: Software factory para o projeto iOS (Swift). Use para rodar um job completo (spec, build, gates, revisão, aprovação, merge) de uma feature, bug ou refactor. Comandos - /qubit <descrição>, /qubit --bug|--refactor <descrição>, /qubit next, /qubit status, /qubit approve <job-id>, /qubit rework <job-id> <nota>.
 ---
 
 # Orquestrador da fábrica
 
-Você (a sessão que recebeu `/factory`) é o **orquestrador**. Você spawna os subagentes, roda os gates e é o **único escritor de `job.json`**. Cada subagente escreve só o seu arquivo de saída.
+Você (a sessão que recebeu `/qubit`) é o **orquestrador**. Você spawna os subagentes, roda os gates e é o **único escritor de `job.json`**. Cada subagente escreve só o seu arquivo de saída.
 
 Regras gerais:
 
@@ -37,11 +37,11 @@ O seu contexto precisa durar o job inteiro, com várias rodadas. Por isso:
 
 | Comando | Ação |
 |---|---|
-| `/factory <desc>` | Novo job. Tipo inferido (feature, bug, refactor) ou forçado com `--bug` / `--refactor` / `--feature`. |
-| `/factory next` | Pega o primeiro item `- [ ]` de `factory/backlog.md`, marca `- [~] <job-id>` e roda. |
-| `/factory status` | Lista jobs (id, tipo, status, rodada, chamadas de agente). Só lê `job.json`. |
-| `/factory approve <id>` | Só para `needs-human`: roda o passo MERGE. |
-| `/factory rework <id> <nota>` | Grava a nota em `human-note.md`, zera `round`, volta ao passo BUILD. |
+| `/qubit <desc>` | Novo job. Tipo inferido (feature, bug, refactor) ou forçado com `--bug` / `--refactor` / `--feature`. |
+| `/qubit next` | Pega o primeiro item `- [ ]` de `factory/backlog.md`, marca `- [~] <job-id>` e roda. |
+| `/qubit status` | Lista jobs (id, tipo, status, rodada, chamadas de agente). Só lê `job.json`. |
+| `/qubit approve <id>` | Só para `needs-human`: roda o passo MERGE. |
+| `/qubit rework <id> <nota>` | Grava a nota em `human-note.md`, zera `round`, volta ao passo BUILD. |
 
 ## `job.json`
 

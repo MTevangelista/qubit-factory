@@ -238,7 +238,7 @@ async function refresh() {
     const ids = dirs.sort();
     const cards = await Promise.all(ids.map(card));
     const board = document.getElementById('board'); board.replaceChildren(...cards);
-    if (!ids.length) board.append($('div', 'sub', 'Nenhum job ainda. Rode /factory <descrição>.'));
+    if (!ids.length) board.append($('div', 'sub', 'Nenhum job ainda. Rode /qubit <descrição>.'));
     document.getElementById('meta').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR') + ' · a cada 2 s';
   } catch (e) { document.getElementById('meta').textContent = 'Erro: ' + e.message + ' (sirva a pasta factory/ com http.server)'; }
   finally { busy = false; }

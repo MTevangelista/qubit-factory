@@ -15,10 +15,10 @@ exit_is() { # exit_is <código> <comando...>
 
 AGENTS="spec-writer builder reviewer-tests reviewer-code reviewer-security reviewer-ui reviewer-ux approver learner"
 REVIEWERS="reviewer-tests reviewer-code reviewer-security reviewer-ui reviewer-ux"
-SKILL=".claude/skills/factory/SKILL.md"
+SKILL=".claude/skills/qubit/SKILL.md"
 
 echo "== Estrutura"
-check "SKILL.md existe com name: factory" grep -q '^name: factory$' "$SKILL"
+check "SKILL.md existe com name: qubit" grep -q '^name: qubit$' "$SKILL"
 for a in $AGENTS; do
   f=".claude/agents/$a.md"
   check "$a: arquivo existe"                 test -f "$f"

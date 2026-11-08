@@ -5,13 +5,13 @@ Uma skill orquestradora, 9 subagentes e arquivos markdown como estado. Você ped
 ## Uso
 
 ```
-/factory <descrição>                 # tipo inferido
-/factory --bug <descrição>           # bug: teste de regressão obrigatório
-/factory --refactor <descrição>      # refactor: sem mudar comportamento nem testes existentes
-/factory next                        # primeiro item não marcado de factory/backlog.md
-/factory status
-/factory approve <job-id>            # merge de um job em needs-human, depois de você revisar
-/factory rework <job-id> <nota>      # devolve ao builder com a sua nota
+/qubit <descrição>                   # tipo inferido
+/qubit --bug <descrição>             # bug: teste de regressão obrigatório
+/qubit --refactor <descrição>        # refactor: sem mudar comportamento nem testes existentes
+/qubit next                          # primeiro item não marcado de factory/backlog.md
+/qubit status
+/qubit approve <job-id>              # merge de um job em needs-human, depois de você revisar
+/qubit rework <job-id> <nota>        # devolve ao builder com a sua nota
 ```
 
 Dashboard: `python3 -m http.server -d factory 8000` e abra http://localhost:8000/dashboard.html.
@@ -34,7 +34,7 @@ INIT (worktree + baseline) -> SPEC -> BUILD -> GATES --FAIL--> BUILD
 
 | Agente | Modelo / effort | Papel | Escreve |
 |---|---|---|---|
-| orquestrador (`/factory`) | **o da sessão**: use Sonnet 5.5 ou Haiku 5.5 | dispara agentes, lê primeiras linhas, atualiza `job.json` | `job.json` |
+| orquestrador (`/qubit`) | **o da sessão**: use Sonnet 5.5 ou Haiku 5.5 | dispara agentes, lê primeiras linhas, atualiza `job.json` | `job.json` |
 | `spec-writer` | Opus 5.5 (`claude-opus-5-5`) / high | spec com ACs verificáveis | `spec.md` |
 | `builder` | Opus 5.5 (`claude-opus-5-5`) / high | implementa com testes, no worktree | commits + `build.md` |
 | `reviewer-tests` | Opus 5.5 (`claude-opus-5-5`) / high | verifica ACs e testes **sem ler `build.md`** | `review-tests.md` |
@@ -45,7 +45,7 @@ INIT (worktree + baseline) -> SPEC -> BUILD -> GATES --FAIL--> BUILD
 | `approver` | Opus 5.5 (`claude-opus-5-5`) / high | confere cada AC; `APPROVE` ou `ESCALATE` | `decision.md` |
 | `learner` | Sonnet 5.5 (`claude-sonnet-5-5`) / low | propõe lições comparando com jobs anteriores (só leitura) | nada; o orquestrador grava `lessons.md` |
 
-**Antes de rodar `/factory`, troque o modelo da sessão para Sonnet 5.5 ou Haiku 5.5.** O orquestrador roda no modelo da sessão e acompanha o job inteiro; os agentes têm `model` (ID exato, não alias) e `effort` fixos no frontmatter, então o custo deles não depende da sessão. Num fluxo equivalente, com a geração anterior de modelos, a diferença medida foi de US$ 2,65 (Haiku) para US$ 43,68 (Opus).
+**Antes de rodar `/qubit`, troque o modelo da sessão para Sonnet 5.5 ou Haiku 5.5.** O orquestrador roda no modelo da sessão e acompanha o job inteiro; os agentes têm `model` (ID exato, não alias) e `effort` fixos no frontmatter, então o custo deles não depende da sessão. Num fluxo equivalente, com a geração anterior de modelos, a diferença medida foi de US$ 2,65 (Haiku) para US$ 43,68 (Opus).
 
 ## Garantias e controles
 

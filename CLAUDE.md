@@ -1,6 +1,6 @@
 # qubit-factory
 
-App iOS em Swift. Este repo tem uma **software factory** (`/factory`) que produz features, correções de bug e refactors com agentes. Detalhes em `factory/README.md`.
+App iOS em Swift. Este repo tem uma **software factory** (`/qubit`) que produz features, correções de bug e refactors com agentes. Detalhes em `factory/README.md`.
 
 ## Projeto
 - Linguagem: Swift 6, UI em SwiftUI. Mínimo iOS: _preencher_.
