@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(bash scripts/factory-gates.sh:*)",
+      "Bash(git worktree:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(xcodebuild:*)",
+      "Bash(swift build:*)",
+      "Bash(swift test:*)",
+      "Bash(swiftlint:*)"
+    ],
+    "deny": [
+      "Bash(git push:*)"
+    ]
+  }
+}
