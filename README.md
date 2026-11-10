@@ -21,6 +21,7 @@ A stack não está fixa no código da fábrica: ela vem de um **perfil** (`ios`,
 - [Configuração](#configuração)
 - [Garantias e proteções](#garantias-e-proteções)
 - [Limites conhecidos](#limites-conhecidos)
+- [Versões](#versões)
 
 ---
 
@@ -31,7 +32,7 @@ A stack não está fixa no código da fábrica: ela vem de um **perfil** (`ios`,
 | Orquestrador | [`plugins/qubit/skills/qubit/SKILL.md`](plugins/qubit/skills/qubit/SKILL.md) | A sessão que recebe `/qubit`. Dispara agentes, roda gates, é o único que escreve `job.json` e quem abre o MR. |
 | Subagentes (9) | [`plugins/qubit/agents/`](plugins/qubit/agents/) | Spec, build, 5 revisores, aprovação e aprendizado. Cada um escreve só o próprio arquivo. |
 | Gates | [`plugins/qubit/scripts/factory-gates.sh`](plugins/qubit/scripts/factory-gates.sh) | Verificação sem LLM: segredos no diff, lint/formato/tipos, build e testes, com os comandos do perfil. |
-| Guarda | [`plugins/qubit/hooks/guard.sh`](plugins/qubit/hooks/guard.sh) | Hook `PreToolUse` que bloqueia force push, push na branch base, `rm -rf` amplo e edição de gates/config pelos agentes. |
+| Guarda | [`plugins/qubit/hooks/guard.sh`](plugins/qubit/hooks/guard.sh) + [`guard_push.py`](plugins/qubit/hooks/guard_push.py) | Hook `PreToolUse` que bloqueia force push, push na branch base, `rm -rf` amplo e edição de gates/config pelos agentes. O `guard_push.py` interpreta o comando de push (com `shlex`) e libera só o push comum da branch do job. |
 | Config | [`factory/config.sh`](factory/config.sh) | Perfil de stack, comandos dos gates, limites de rodadas e de chamadas. |
 | Perfis | [`plugins/qubit/profiles/`](plugins/qubit/profiles/) | Um par `<perfil>.sh` (comandos e detecção) + `<perfil>.md` (convenções e checklists dos agentes) por stack. |
 | Fila | [`factory/backlog.md`](factory/backlog.md) | Itens consumidos por `/qubit next`. |
@@ -344,7 +345,7 @@ Valor preenchido na config sempre vence o padrão do perfil. Mantenha os comando
 - **Revisores independentes:** não leem `build.md`; verificam o diff e rodam o código.
 - **Gates finais:** mesmo com `APPROVE`, os gates rodam de novo antes de abrir o MR.
 - **Teto de custo:** `max_rounds` e `max_agent_calls` por job; cada chamada fica registrada em `job.json`.
-- **Hook de guarda:** bloqueia force push (`--force`, `-f`, `--force-with-lease`, `+refspec`), push na branch base (`master`, `main` e `FACTORY_BASE_BRANCH`), `push --all`/`--mirror`, apagar `master`/`main`, `reset --hard origin`, `rm -rf` amplo, `curl | sh`, e edição de `.claude/`, `plugins/qubit/`, `factory/config.sh`, `factory/profiles/`, `factory/lessons.md` e `CLAUDE.md` dentro dos worktrees.
+- **Hook de guarda:** bloqueia force push (`--force`, `-f`, `--force-with-lease`, `+refspec`), push na branch base (`master`, `main` e `FACTORY_BASE_BRANCH`), `push --all`/`--mirror`, apagar `master`/`main`, `reset --hard origin`, `rm -rf` amplo, `curl | sh`, e edição de `.claude/`, `.claude-plugin/`, `plugins/qubit/`, `factory/config.sh`, `factory/profiles/`, `factory/lessons.md` e `CLAUDE.md` dentro dos worktrees.
 - **Resiliência:** revisor com saída inválida roda de novo uma vez; push que falha tem uma nova tentativa; conflito com a branch base tem uma tentativa de integração pelo builder (merge de `origin/<base>` na branch do job, nunca rebase). Depois disso, escala.
 - **Contexto enxuto:** o orquestrador decide pela primeira linha dos arquivos e pelo `RELATÓRIO` dos agentes; saída de build vai para `logs/`.
 - **Memória:** achados repetidos em 2+ jobs viram linha em `lessons.md`.
@@ -359,6 +360,12 @@ Valor preenchido na config sempre vence o padrão do perfil. Mantenha os comando
 - O hook analisa o texto do comando: um push montado por variável ou alias não é reconhecido. A proteção de branch no host continua sendo a barreira de verdade.
 - Abrir o MR depende da CLI do host (`gh` ou `glab`) ou de uma ferramenta MCP equivalente; sem nenhuma, o job para em `needs-human` com a branch já publicada.
 - `/qubit rework` zera a rodada, então cada rework pode consumir de novo até `max_rounds` rodadas (ainda limitado por `max_agent_calls`).
+
+---
+
+## Versões
+
+Versão atual do plugin: **0.2.0** ([`plugin.json`](plugins/qubit/.claude-plugin/plugin.json)). Notas de cada versão em [`docs/releases/`](docs/releases/): [v0.2.0](docs/releases/v0.2.0.md) e [v0.1.0](docs/releases/v0.1.0.md).
 
 ---
 
