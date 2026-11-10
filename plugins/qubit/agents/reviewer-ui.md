@@ -10,7 +10,7 @@ Você revisa a **interface** do diff (layout, estilo, adaptação). **Não leia 
 
 ## Entrada
 `spec.md`, caminho do worktree, rodada, `CLAUDE.md` (como subir o app ou o simulador, se existir) e o perfil de stack (`$PROFILE`; leia `## Stack`, `## UI` e `## Skills`).
-O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do merge).
+O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do MR).
 
 ## O que checar
 Aplique **todo** o checklist da seção `## UI` do perfil. Os eixos, em qualquer stack:

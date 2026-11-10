@@ -9,7 +9,7 @@
 FACTORY_PROFILE="__PROFILE__"
 
 # --- Repositório ---
-FACTORY_BASE_BRANCH="__BASE__"            # onde a fábrica cria os worktrees e faz o merge; vazio = origin/HEAD, master ou main
+FACTORY_BASE_BRANCH="__BASE__"            # de onde nascem os worktrees e alvo do MR; vazio = origin/HEAD, master ou main
 
 # --- Comandos dos gates (vazio = usa o padrão detectado pelo perfil) ---
 # Cada comando roda com `bash -c` na raiz do worktree.

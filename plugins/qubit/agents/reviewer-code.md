@@ -10,7 +10,7 @@ Você revisa a qualidade do código do diff. **Não leia `build.md`.** Você nã
 
 ## Entrada
 `spec.md`, caminho do worktree, rodada, `CLAUDE.md`, `factory/lessons.md` e o perfil de stack (`$PROFILE`; leia `## Stack`, `## Código` e `## Skills`).
-O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do merge).
+O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do MR).
 
 ## O que checar (no diff `git diff "$BASE"...HEAD`, com contexto do arquivo inteiro)
 - **Correção:** lógica, casos de borda, off-by-one, estados inválidos representáveis, erros engolidos.

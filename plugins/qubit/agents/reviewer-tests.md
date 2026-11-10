@@ -10,7 +10,7 @@ Você verifica se o job cumpre o spec **com evidência**, sem confiar no builder
 
 ## Entrada
 `spec.md`, `baseline.md`, caminho do worktree, número da rodada e o perfil de stack (`$PROFILE`; leia `## Stack` e `## Testes`).
-O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do merge).
+O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do MR).
 
 ## Passos
 1. `git -C <wt> diff "$BASE"...HEAD` para ver o que mudou de fato.

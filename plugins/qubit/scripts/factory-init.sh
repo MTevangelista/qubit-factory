@@ -95,12 +95,15 @@ allow = perm.setdefault("allow", []); deny = perm.setdefault("deny", [])
 want = ["Bash(git worktree:*)", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)"]
 want += [r for r in sys.argv[1].split(";") if r]
 added = [r for r in want if r not in allow]; allow += added
-deny_want = ["Bash(git " + "push:*)"]
-deny_added = [r for r in deny_want if r not in deny]; deny += deny_added
-if added or deny_added:
+# Versões antigas da fábrica negavam push. Hoje ela publica a branch do job e abre MR;
+# quem barra force push e push na branch base é o hook de guarda.
+old_deny = "Bash(git " + "push:*)"
+removed = deny.count(old_deny)
+deny[:] = [r for r in deny if r != old_deny]
+if added or removed:
     with open(p, "w") as f:
         json.dump(d, f, indent=2, ensure_ascii=False); f.write("\n")
-    print(f"criado: .claude/settings.json (+{len(added)} allow, +{len(deny_added)} deny)")
+    print(f"criado: .claude/settings.json (+{len(added)} allow" + (", deny antigo de push removido)" if removed else ")"))
 else:
     print("mantido: .claude/settings.json (permissões já presentes)")
 PY
@@ -118,6 +121,12 @@ INFO_RC=$?
 echo
 echo "Próximos passos (pessoa):"
 echo "1. Preencha os campos _preencher_ do CLAUDE.md e revise factory/config.sh (comandos que o perfil não detectar)."
-echo "2. Faça commit na branch $BASE de factory/, .gitignore, CLAUDE.md e .claude/settings.json (o worktree nasce dela)."
-echo "3. Rode /qubit <descrição> (ou /qubit next com itens em factory/backlog.md)."
+echo "2. Faça commit na branch $BASE de factory/, .gitignore, CLAUDE.md e .claude/settings.json e publique-a (o worktree nasce dela)."
+if git remote get-url origin >/dev/null 2>&1; then
+  echo "3. Para abrir o MR, deixe a CLI do host instalada e autenticada: gh (GitHub) ou glab (GitLab)."
+else
+  echo "3. Configure o remoto origin (git remote add origin <url>): a fábrica publica a branch do job e abre MR."
+  echo "   Para abrir o MR, deixe a CLI do host instalada e autenticada: gh (GitHub) ou glab (GitLab)."
+fi
+echo "4. Rode /qubit <descrição> (ou /qubit next com itens em factory/backlog.md)."
 exit $INFO_RC

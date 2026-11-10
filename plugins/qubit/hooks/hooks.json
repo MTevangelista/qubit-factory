@@ -1,5 +1,5 @@
 {
-  "description": "Guarda da fábrica qubit: bloqueia git push, comandos destrutivos e edição de gates, hooks e config dentro dos worktrees.",
+  "description": "Guarda da fábrica qubit: bloqueia force push, push na branch base, comandos destrutivos e edição de gates, hooks e config dentro dos worktrees.",
   "hooks": {
     "PreToolUse": [
       {
