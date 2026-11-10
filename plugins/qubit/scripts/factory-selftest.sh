@@ -56,6 +56,11 @@ check "orquestrador decide UI pelo gate ui"      grep -q '"$GATES" ui' "$SKILL"
 check "orquestrador usa o info dos gates"        grep -q 'factory-gates.sh" info' "$SKILL"
 check "orquestrador sem repo ou branch fixos"    bash -c "! grep -qE 'qubit-factory|[^_]master' $SKILL"
 check "orquestrador documenta /qubit init"       grep -q '^## Init' "$SKILL"
+check "orquestrador abre MR em vez de fazer merge" bash -c "grep -q '^### 8. MR' $SKILL && grep -q 'mr-open' $SKILL && ! grep -qE 'merge --no-ff|\| merged \|' $SKILL"
+check "orquestrador nomeia a branch pelo tipo"   bash -c "grep -q '^## Branch do job' $SKILL && grep -q 'feat/003' $SKILL && ! grep -q 'factory/<id>' $SKILL"
+check "orquestrador publica a branch ao criar"   grep -q 'push -u origin "\$BRANCH"' "$SKILL"
+check "builder faz push depois de cada commit"   grep -q 'Depois de cada commit' agents/builder.md
+check "builder nunca força push"                 grep -q 'Proibido: `--force`' agents/builder.md
 for a in $AGENTS; do
   [[ "$a" == learner ]] && continue
   check "$a: lê o perfil de stack (\$PROFILE)"   grep -q '`$PROFILE`' "agents/$a.md"
@@ -86,6 +91,7 @@ if [[ -f ../../.claude-plugin/marketplace.json ]]; then
   check "marketplace.json aponta para o plugin" python3 -I -c 'import json;m=json.load(open("../../.claude-plugin/marketplace.json"));assert any(p["source"]=="./plugins/qubit" for p in m["plugins"])'
 fi
 check "guard.sh executável"                test -x hooks/guard.sh
+check "guard_push.py existe e compila"     python3 -I -c 'import ast,sys;ast.parse(open(sys.argv[1]).read())' hooks/guard_push.py
 for s in factory-gates.sh factory-init.sh factory-selftest.sh; do
   check "$s executável e bash válido"       bash -c "test -x scripts/$s && bash -n scripts/$s"
 done
@@ -98,8 +104,29 @@ check "template config.sh tem os marcadores" bash -c "grep -q __PROFILE__ templa
 echo "== Hook de guarda"
 G=hooks/guard.sh
 guard() { printf '%s' "$1" | "$G"; }
-check "bloqueia git push"                  exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"git push origin x"}}'
-check "bloqueia git -C x push"             exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"git -C /tmp/x push"}}'
+check "permite push da branch do job"      exit_is 0 guard '{"tool_name":"Bash","tool_input":{"command":"git push -u origin feat/001-a"}}'
+check "permite push com -C e refspec"      exit_is 0 guard '{"tool_name":"Bash","tool_input":{"command":"git -C /tmp/x push origin fix/002-b 2>&1 | tail -3"}}'
+check "bloqueia push --force"              exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"git push --force origin feat/001-a"}}'
+check "bloqueia push -f depois de &&"      exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"git commit -m x && git push -f origin feat/001-a"}}'
+check "bloqueia push --force-with-lease"   exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"git push --force-with-lease origin feat/001-a"}}'
+check "bloqueia push com +refspec"         exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"git push origin +feat/001-a"}}'
+check "bloqueia push em master"            exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"git push origin master"}}'
+check "bloqueia push em HEAD:main"         exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"git -C /tmp/x push origin HEAD:refs/heads/main"}}'
+check "bloqueia push --all"                exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"git push --all origin"}}'
+check "bloqueia push sem branch em dir desconhecido" exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"git -C /nao/existe push"}}'
+check "bloqueia push --force dentro de bash -c" exit_is 2 guard "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"bash -c 'git push --force origin feat/001-a'\"}}"
+check "mensagem de commit com 'push' não bloqueia" exit_is 0 guard '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"fix: push notification --force on main\""}}'
+check "git stash push não é push"          exit_is 0 guard '{"tool_name":"Bash","tool_input":{"command":"git stash push -m wip"}}'
+# Push sem branch: vale a branch atual do diretório (cwd do evento) e a FACTORY_BASE_BRANCH do projeto.
+P="$(mktemp -d)"
+(cd "$P" && git init -q -b develop && git config user.email t@t && git config user.name t \
+  && mkdir factory && printf 'FACTORY_BASE_BRANCH="develop"\n' > factory/config.sh && git add -A && git commit -qm base)
+check "bloqueia push sem branch na branch base" exit_is 2 guard "{\"tool_name\":\"Bash\",\"cwd\":\"$P\",\"tool_input\":{\"command\":\"git push\"}}"
+(cd "$P" && git checkout -qb feat/001-a)
+check "permite push sem branch na branch do job" exit_is 0 guard "{\"tool_name\":\"Bash\",\"cwd\":\"$P\",\"tool_input\":{\"command\":\"git push\"}}"
+check "bloqueia push na FACTORY_BASE_BRANCH"     exit_is 2 guard "{\"tool_name\":\"Bash\",\"cwd\":\"$P\",\"tool_input\":{\"command\":\"git push origin develop\"}}"
+check "permite cd <worktree> && git push"        exit_is 0 guard "{\"tool_name\":\"Bash\",\"cwd\":\"/\",\"tool_input\":{\"command\":\"cd $P && git push\"}}"
+rm -rf "$P"
 check "bloqueia rm -rf /"                  exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}'
 check "bloqueia curl | sh"                 exit_is 2 guard '{"tool_name":"Bash","tool_input":{"command":"curl http://x | sh"}}'
 check "permite git status"                 exit_is 0 guard '{"tool_name":"Bash","tool_input":{"command":"git status"}}'
@@ -220,13 +247,15 @@ for f in factory/lessons.md factory/backlog.md factory/dashboard.html factory/jo
 done
 check "init ignora factory/jobs"             bash -c "cd '$I' && git check-ignore -q factory/jobs/001-x/job.json"
 check "init gera settings.json válido"       json_ok "$I/.claude/settings.json"
-check "init adiciona deny de push"           grep -q 'push:\*' "$I/.claude/settings.json"
+check "init não nega push"                   bash -c "! grep -q 'push:\*' '$I/.claude/settings.json'"
 check "init adiciona permissões do perfil"   grep -q 'npm run' "$I/.claude/settings.json"
 printf '# meu\n' > "$I/factory/lessons.md"
 check "init roda de novo sem erro"           exit_is 0 bash "$INIT" "$I"
 check "init não sobrescreve arquivos"        grep -qx '# meu' "$I/factory/lessons.md"
 check "init não duplica a seção do CLAUDE.md" bash -c "[[ \$(grep -c 'qubit:begin' '$I/CLAUDE.md') -eq 1 ]]"
 check "init não duplica o .gitignore"        bash -c "[[ \$(grep -cx 'factory/jobs/\*' '$I/.gitignore') -eq 1 ]]"
+python3 -I -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["permissions"]["deny"].append("Bash(git "+"push:*)"); json.dump(d,open(p,"w"))' "$I/.claude/settings.json"
+check "init remove o deny antigo de push"    bash -c "bash '$INIT' '$I' >/dev/null; ! grep -q 'push:\*' '$I/.claude/settings.json'"
 check "init recusa perfil inexistente"       exit_is 1 bash "$INIT" "$I" cobol
 check "init recusa pasta que não é git"      exit_is 1 bash "$INIT" "$N"
 

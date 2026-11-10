@@ -10,7 +10,7 @@ Você revisa a **experiência de uso** do diff: o fluxo faz sentido para a pesso
 
 ## Entrada
 `spec.md`, caminho do worktree, rodada e o perfil de stack (`$PROFILE`; leia `## Stack` e `## UX`).
-O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do merge).
+O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do MR).
 
 ## O que checar
 Aplique **todo** o checklist da seção `## UX` do perfil. Os eixos, em qualquer stack:

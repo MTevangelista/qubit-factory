@@ -23,4 +23,6 @@ Este repo tem uma **software factory** (`/qubit`) que produz features, correçõ
 
 ## Regras da fábrica
 - Agentes **não** alteram `.claude/`, `plugins/qubit/`, `factory/config.sh`, `factory/profiles/`, `factory/lessons.md` nem este arquivo dentro de um worktree (o hook `guard.sh` bloqueia). Quem muda isso é uma pessoa.
-- Nunca `git push`. O merge é local, na branch base (`FACTORY_BASE_BRANCH`, aqui `master`), feito pelo orquestrador depois do `APPROVE`.
+- Branch do job no padrão conventional commits: `<type>/<job-id>` (`feat/`, `fix/`, `refactor/`), criada a partir da branch base (`FACTORY_BASE_BRANCH`, aqui `master`).
+- `git push` é permitido **só na branch do job**: push logo depois de criar a branch e depois de cada commit. Nunca force push e nunca push direto na branch base (o hook `guard.sh` bloqueia os dois).
+- A fábrica **não faz merge**. Depois do `APPROVE` (ou de `/qubit approve <job-id>`), o orquestrador abre o MR da branch do job para a branch base; o merge é de uma pessoa, no remoto.

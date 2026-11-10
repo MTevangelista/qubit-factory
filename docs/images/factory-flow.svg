@@ -36,8 +36,8 @@
   <!-- 1 INIT -->
   <rect x="250" y="160" width="300" height="68" rx="10" class="step"/>
   <text x="400" y="184" class="t" text-anchor="middle">1 · INIT</text>
-  <text x="400" y="203" class="s" text-anchor="middle">job.json · worktree · branch factory/&lt;id&gt;</text>
-  <text x="400" y="220" class="s" text-anchor="middle">baseline dos gates (o que já quebrava)</text>
+  <text x="400" y="203" class="s" text-anchor="middle">worktree · branch &lt;type&gt;/&lt;id&gt; + push</text>
+  <text x="400" y="220" class="s" text-anchor="middle">job.json · baseline dos gates</text>
   <line x1="400" y1="228" x2="400" y2="256" class="e"/>
 
   <!-- 2 SPEC -->
@@ -64,7 +64,7 @@
   <rect x="250" y="398" width="300" height="68" rx="10" class="step"/>
   <text x="400" y="422" class="t" text-anchor="middle">3 · BUILD</text>
   <text x="400" y="441" class="s" text-anchor="middle">builder implementa + testes no worktree</text>
-  <text x="400" y="458" class="s" text-anchor="middle">commits + build.md</text>
+  <text x="400" y="458" class="s" text-anchor="middle">commits (push após cada um) + build.md</text>
   <line x1="400" y1="466" x2="400" y2="490" class="e"/>
 
   <!-- 4 GATES -->
@@ -132,45 +132,45 @@
   <text x="845" y="905" class="t" text-anchor="middle">🧑 needs-human</text>
   <text x="845" y="925" class="s" text-anchor="middle">ESCALATE ou gates finais com FAIL</text>
   <text x="845" y="943" class="s" text-anchor="middle">leia a seção Motivo de decision.md</text>
-  <text x="845" y="961" class="s" text-anchor="middle">e revise a branch factory/&lt;id&gt;</text>
+  <text x="845" y="961" class="s" text-anchor="middle">e revise a branch do job (já publicada)</text>
   <line x1="712" y1="975" x2="978" y2="975" stroke="#e8b98a"/>
   <text x="712" y="999" class="c">/qubit approve &lt;id&gt;</text>
-  <text x="978" y="999" class="s" text-anchor="end">→ merge</text>
+  <text x="978" y="999" class="s" text-anchor="end">→ abre o MR</text>
   <text x="712" y="1025" class="c">/qubit rework &lt;id&gt; &lt;nota&gt;</text>
   <text x="978" y="1043" class="s" text-anchor="end">→ volta ao BUILD</text>
 
   <line x1="400" y1="1070" x2="400" y2="1108" class="e"/>
   <text x="410" y="1094" class="l">PASS</text>
 
-  <!-- 8 MERGE -->
+  <!-- 8 MR -->
   <rect x="250" y="1110" width="300" height="68" rx="10" class="step"/>
-  <text x="400" y="1134" class="t" text-anchor="middle">8 · MERGE local</text>
-  <text x="400" y="1153" class="s" text-anchor="middle">git merge --no-ff na branch base</text>
-  <text x="400" y="1170" class="s" text-anchor="middle">nunca há git push</text>
+  <text x="400" y="1134" class="t" text-anchor="middle">8 · MR</text>
+  <text x="400" y="1153" class="s" text-anchor="middle">abre o MR: branch do job → branch base</text>
+  <text x="400" y="1170" class="s" text-anchor="middle">gh ou glab · a fábrica não faz merge</text>
 
   <line x1="550" y1="1144" x2="688" y2="1144" class="e"/>
   <text x="619" y="1136" class="l" text-anchor="middle">conflito</text>
   <rect x="690" y="1110" width="310" height="68" rx="10" class="step"/>
-  <text x="845" y="1134" class="t" text-anchor="middle">rebase automático</text>
-  <text x="845" y="1153" class="s" text-anchor="middle">builder faz rebase + gates</text>
-  <text x="845" y="1170" class="s" text-anchor="middle">segunda tentativa de merge</text>
+  <text x="845" y="1134" class="t" text-anchor="middle">integrar a base</text>
+  <text x="845" y="1153" class="s" text-anchor="middle">builder faz merge de origin/&lt;base&gt;</text>
+  <text x="845" y="1170" class="s" text-anchor="middle">na branch do job · push · gates de novo</text>
 
   <path d="M690,1170 L552,1222" class="e"/>
   <text x="612" y="1214" class="l" text-anchor="middle">ok</text>
 
   <line x1="845" y1="1178" x2="845" y2="1236" class="eh"/>
-  <text x="855" y="1212" class="lh">falhou de novo</text>
+  <text x="855" y="1212" class="lh">não resolveu</text>
   <rect x="690" y="1238" width="310" height="60" rx="10" class="human"/>
   <text x="845" y="1262" class="t" text-anchor="middle">🧑 needs-human</text>
-  <text x="845" y="1282" class="s" text-anchor="middle">conflito persistente: resolva à mão</text>
+  <text x="845" y="1282" class="s" text-anchor="middle">conflito persistente ou MR não abriu</text>
 
   <line x1="400" y1="1178" x2="400" y2="1206" class="e"/>
   <text x="410" y="1198" class="l">ok</text>
 
   <!-- DONE -->
   <rect x="250" y="1208" width="300" height="60" rx="30" class="ok"/>
-  <text x="400" y="1233" class="t" text-anchor="middle">✅ merged</text>
-  <text x="400" y="1252" class="s" text-anchor="middle">worktree removido · backlog marcado [x]</text>
+  <text x="400" y="1233" class="t" text-anchor="middle">✅ mr-open</text>
+  <text x="400" y="1252" class="s" text-anchor="middle">🧑 o merge é seu, no remoto · backlog [x]</text>
   <line x1="400" y1="1268" x2="400" y2="1296" class="e"/>
 
   <!-- 9 APRENDER -->

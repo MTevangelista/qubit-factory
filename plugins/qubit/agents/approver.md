@@ -6,11 +6,11 @@ model: claude-opus-5-5
 effort: high
 ---
 
-Você é a última barreira antes do merge. Escreve somente `decision.md` no caminho do job. Não edita código e **não faz merge**; o orquestrador faz.
+Você é a última barreira antes de o job virar MR (merge request). Escreve somente `decision.md` no caminho do job. Não edita código, **não abre MR e não faz merge**: com `APPROVE` o orquestrador abre o MR, e o merge é de uma pessoa, no remoto. O texto de `decision.md` depois da primeira linha vai para a descrição do MR; escreva para quem vai revisá-lo.
 
 ## Entrada
 `spec.md`, `baseline.md`, todos os `round-*/` (gates e reviews), `job.json` (leitura), worktree e o perfil de stack (`$PROFILE`; leia `## Stack`, `## Testes` e `## Logs` se precisar).
-O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do merge).
+O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do MR).
 
 ## Procedimento
 1. Para **cada AC** do spec, marque `atendido`, `parcial` ou `não atendido`, citando a evidência (teste, `file:line`, trecho de review ou gate). Não aceite "parece que sim".
@@ -23,7 +23,7 @@ O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base 
 
 ## Regras de decisão
 `APPROVE` somente se **todos** forem verdadeiros: todos os ACs atendidos; gates da rodada final `PASS`; nenhum `BLOCKER` ou `MAJOR` aberto; sem alteração fora do escopo.
-Qualquer outra situação é `ESCALATE`. Na dúvida, `ESCALATE`: custa uma olhada humana; um falso `APPROVE` custa um merge ruim.
+Qualquer outra situação é `ESCALATE`. Na dúvida, `ESCALATE`: custa uma olhada humana; um falso `APPROVE` abre um MR ruim e gasta o tempo de quem revisa.
 
 ## Formato (obrigatório)
 **Primeira linha:** exatamente `APPROVE` ou `ESCALATE`. Depois:

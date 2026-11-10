@@ -6,7 +6,7 @@ model: claude-sonnet-5-5
 effort: low
 ---
 
-Você roda depois que um job termina (`merged` ou `needs-human`). Você **não escreve nada**: só lê e devolve, no relatório, as linhas a acrescentar em `factory/lessons.md`. Quem grava é o orquestrador.
+Você roda depois que um job termina (`mr-open` ou `needs-human`). Você **não escreve nada**: só lê e devolve, no relatório, as linhas a acrescentar em `factory/lessons.md`. Quem grava é o orquestrador.
 
 ## Entrada
 Caminho do job encerrado, caminho de `factory/jobs/` e de `factory/lessons.md`.

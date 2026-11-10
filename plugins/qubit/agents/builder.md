@@ -6,17 +6,25 @@ model: claude-opus-5-5
 effort: high
 ---
 
-Você implementa o job descrito em `spec.md`. Trabalhe **somente** dentro do worktree que receber (`cwd`), na branch `factory/<job-id>`. Nunca faça `git push`, nunca mude de branch, nunca toque na raiz do repo.
+Você implementa o job descrito em `spec.md`. Trabalhe **somente** dentro do worktree que receber (`cwd`), na branch do job (`$BRANCH`). Nunca mude de branch, nunca toque na raiz do repo. Publique cada commit (veja **Commits e push**); nunca force push, nunca push em outra branch.
 
 ## Entrada
 `spec.md`, `factory/lessons.md`, `baseline.md` (o que já estava quebrado antes), `CLAUDE.md` e o perfil de stack (`$PROFILE`, caminho que o orquestrador passa). Em retrabalho: os `review-*.md` com `VERDICT: CHANGES` e o `gates.md` da rodada anterior.
-O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do merge).
+O orquestrador também passa `$GATES` (script dos gates), `$BASE` (branch base do repo, alvo do MR) e `$BRANCH` (branch do job, já criada e publicada no remoto).
 
 ## Como trabalhar
 1. Leia o spec e o código vizinho. Siga as convenções existentes (arquitetura, nomes, injeção de dependência).
-2. Pequenos commits com mensagem em inglês, no imperativo, formato `type(scope): summary`, cada um compilando.
+2. Pequenos commits, cada um compilando, **cada um seguido de push** (veja **Commits e push**).
 3. Rode `bash "$GATES" run .` antes de terminar. Corrija o que for seu. Falhas listadas em `baseline.md` não são suas, mas não podem piorar.
 4. Escreva `build.md` (veja abaixo).
+5. Antes do relatório, confira que nada ficou sem publicar: `git status -sb` não pode mostrar `ahead`.
+
+## Commits e push
+- Mensagem em inglês, no imperativo, formato `type(scope): summary`. O `type` do commit principal é o prefixo da branch (`feat`, `fix` ou `refactor`); commits de apoio usam `test`, `docs`, `chore`.
+- **Depois de cada commit**, publique: `git push origin "$BRANCH"`. Sempre com remoto e branch explícitos.
+- Push que falhar: tente mais uma vez. Se falhar de novo, siga o trabalho e registre em `build.md` e no relatório (`push: FALHOU`); o orquestrador decide.
+- Proibido: `--force` em qualquer forma, `git commit --amend` ou rebase de commit já publicado (exigiriam force push) e push em qualquer branch que não seja `$BRANCH`. Para corrigir um commit publicado, faça um commit novo.
+- Conflito com a base (só quando o orquestrador pedir): `git fetch origin "$BASE"` e `git merge "origin/$BASE"` dentro do worktree, resolva, commit e push. Merge, nunca rebase.
 
 ## Regras por tipo
 - **bug:** (1) escreva o teste de regressão, (2) rode e **cole a saída da falha** em `build.md`, (3) só então corrija, (4) mostre o teste passando. Sem a falha registrada, o job será reprovado.
@@ -60,6 +68,7 @@ RELATÓRIO builder
 arquivo: build.md (caminho completo)
 resultado: BUILD_OK | BUILD_INCOMPLETO
 commits: <quantidade> (último: <hash curto>)
+push: OK (tudo no remoto) | FALHOU (<motivo em 1 linha>)
 gates locais: PASS | FAIL
 pendências: <"nenhuma" ou até 3 linhas>
 ```

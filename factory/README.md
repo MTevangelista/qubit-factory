@@ -1,6 +1,6 @@
 # Software factory (independente de linguagem)
 
-Uma skill orquestradora, 9 subagentes e arquivos markdown como estado. Você pede uma feature, um bug ou um refactor; os agentes escrevem o spec, constroem em uma branch própria, passam por gates determinísticos, são revisados e então aprovados (merge local) ou escalados para você.
+Uma skill orquestradora, 9 subagentes e arquivos markdown como estado. Você pede uma feature, um bug ou um refactor; os agentes escrevem o spec, constroem em uma branch própria, passam por gates determinísticos, são revisados e então aprovados (a fábrica abre o MR; o merge é seu, no remoto) ou escalados para você.
 
 A stack vem de um **perfil** (`FACTORY_PROFILE` em `factory/config.sh`): `ios`, `android`, `web`, `python` ou `generic`. O perfil define os comandos padrão dos gates e as convenções e checklists dos agentes. Veja [`profiles/README.md`](profiles/README.md) para criar um novo.
 
@@ -12,7 +12,7 @@ A stack vem de um **perfil** (`FACTORY_PROFILE` em `factory/config.sh`): `ios`, 
 /qubit --refactor <descrição>        # refactor: sem mudar comportamento nem testes existentes
 /qubit next                          # primeiro item não marcado de factory/backlog.md
 /qubit status
-/qubit approve <job-id>              # merge de um job em needs-human, depois de você revisar
+/qubit approve <job-id>              # sua aprovação para abrir o MR de um job em needs-human (não faz merge)
 /qubit rework <job-id> <nota>        # devolve ao builder com a sua nota
 ```
 
@@ -21,7 +21,7 @@ Dashboard: `python3 -m http.server -d factory 8000` e abra http://localhost:8000
 ## O loop
 
 ```
-INIT (worktree + baseline) -> SPEC -> BUILD -> GATES --FAIL--> BUILD
+INIT (worktree + push da branch + baseline) -> SPEC -> BUILD -> GATES --FAIL--> BUILD
                                                  |
                                                PASS
                                                  v
@@ -29,8 +29,15 @@ INIT (worktree + baseline) -> SPEC -> BUILD -> GATES --FAIL--> BUILD
                                                  |
                                                PASS
                                                  v
-                                APPROVE -> gates de novo -> MERGE   |  ESCALATE -> needs-human
+                                APPROVE -> gates de novo -> MR (mr-open)   |  ESCALATE -> needs-human
 ```
+
+## Branch, push e MR
+
+- **Branch do job:** `<type>/<job-id>`, no padrão conventional commits: `feat/` (feature), `fix/` (bug) ou `refactor/`. Ex.: `feat/003-login-biometrico`.
+- **Push:** logo depois de criar a branch (`-u origin <branch>`) e depois de cada commit do builder. Nunca force push, nunca push na branch base.
+- **MR:** com `APPROVE` (ou `/qubit approve <job-id>`), o orquestrador abre o MR da branch do job para a branch base com `gh` (GitHub) ou `glab` (GitLab). Título `type(escopo): resumo` em inglês; descrição a partir de `decision.md`. O link fica em `job.json.mr` e o status vira `mr-open`.
+- **Merge:** é de uma pessoa, no remoto. A fábrica nunca faz merge na branch base.
 
 ## Agentes
 
@@ -38,7 +45,7 @@ INIT (worktree + baseline) -> SPEC -> BUILD -> GATES --FAIL--> BUILD
 |---|---|---|---|
 | orquestrador (`/qubit`) | **o da sessão**: use Sonnet 5.5 ou Haiku 5.5 | dispara agentes, lê primeiras linhas, atualiza `job.json` | `job.json` |
 | `spec-writer` | Opus 5.5 (`claude-opus-5-5`) / high | spec com ACs verificáveis | `spec.md` |
-| `builder` | Opus 5.5 (`claude-opus-5-5`) / high | implementa com testes, no worktree | commits + `build.md` |
+| `builder` | Opus 5.5 (`claude-opus-5-5`) / high | implementa com testes, no worktree; push depois de cada commit | commits + `build.md` |
 | `reviewer-tests` | Opus 5.5 (`claude-opus-5-5`) / high | verifica ACs e testes **sem ler `build.md`** | `review-tests.md` |
 | `reviewer-code` | Sonnet 5.5 (`claude-sonnet-5-5`) / medium | correção, concorrência, performance | `review-code.md` |
 | `reviewer-security` | Opus 5.5 (`claude-opus-5-5`) / high | segredos, armazenamento, rede, entrada, privacidade (conforme o perfil) | `review-security.md` |
@@ -57,8 +64,8 @@ INIT (worktree + baseline) -> SPEC -> BUILD -> GATES --FAIL--> BUILD
 - **Revisores independentes:** não leem `build.md`; rodam o código e conferem o diff.
 - **Tipos de job:** bug exige teste que falha antes e passa depois; refactor exige caracterização antes e proíbe alterar testes existentes.
 - **Custo:** `max_rounds` e `max_agent_calls` por job (`factory/config.sh`), registro de cada chamada em `job.json`.
-- **Guarda** (`plugins/qubit/hooks/guard.sh`): bloqueia `git push`, `rm -rf` amplo e edição de gates/hooks/config/perfis dentro de worktrees.
-- **Resiliência:** revisor sem arquivo válido roda de novo uma vez, depois escala; conflito de merge tem uma tentativa de rebase, depois escala.
+- **Guarda** (`plugins/qubit/hooks/guard.sh`): bloqueia force push, push na branch base, `rm -rf` amplo e edição de gates/hooks/config/perfis dentro de worktrees.
+- **Resiliência:** revisor sem arquivo válido roda de novo uma vez, depois escala; push que falha tem uma nova tentativa; conflito com a branch base tem uma tentativa de integração pelo builder (merge de `origin/<base>`, nunca rebase), depois escala.
 - **Contexto do orquestrador:** cada agente termina com um bloco `RELATÓRIO` de até 15 linhas; o orquestrador decide por ele e pela primeira linha dos arquivos, sem ler spec, build, reviews nem decision inteiros. Ele também não manda mensagens de "já acabou?" para agentes em andamento.
 - **Saída de build fora do contexto:** agentes com `Bash` usam `factory-gates.sh` (que resume) ou redirecionam build e teste para `factory/jobs/<id>/logs/` e leem só com `rg`, usando o padrão da seção `## Logs` do perfil.
 - **Memória:** achados repetidos em 2+ jobs viram linha em `lessons.md` (o `learner` propõe, o orquestrador grava).
@@ -69,5 +76,5 @@ INIT (worktree + baseline) -> SPEC -> BUILD -> GATES --FAIL--> BUILD
 ## Limites conhecidos
 
 - Os revisores têm `Bash` e `Write` (precisam rodar testes e gravar a revisão). "Não editar código" é regra de prompt, não barreira técnica; o hook só protege gates, hooks e config.
-- Não há CI remoto: o gate local faz esse papel. Se adicionar CI, exija-o no passo MERGE.
+- A fábrica não espera o CI remoto: o gate local faz esse papel antes do MR. Se houver CI, exija-o no MR (proteção de branch no host).
 - Antes de usar de verdade, escolha o perfil e preencha `factory/config.sh` e o `CLAUDE.md` quando o projeto existir.

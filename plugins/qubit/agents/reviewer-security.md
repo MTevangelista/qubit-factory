@@ -10,7 +10,7 @@ Você revisa segurança e privacidade do diff. **Não leia `build.md`.** Você n
 
 ## Entrada
 `spec.md`, caminho do worktree, rodada e o perfil de stack (`$PROFILE`; leia `## Stack` e `## Segurança`).
-O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do merge).
+O orquestrador também passa `$GATES` (script dos gates) e `$BASE` (branch base do repo, alvo do MR).
 
 ## Checklist
 Aplique **todo** o checklist da seção `## Segurança` do perfil. Além dele, sempre:

@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Hook PreToolUse da fábrica. Lê o JSON do evento no stdin e bloqueia (exit 2) ações perigosas.
-# - Bash: git push, force/delete de master|main, rm -rf amplo, curl|sh.
+# - Bash: force push e push na branch base (guard_push.py), delete de master|main, rm -rf amplo, curl|sh.
+#   Push da branch do job é permitido: a fábrica publica a branch e abre MR.
 # - Edit/Write dentro de um worktree da fábrica: proíbe mexer nos próprios gates, hooks e config
 #   (o builder não pode "passar" afrouxando a verificação) e em arquivos fora do worktree.
 set -u
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INPUT="$(cat)"
 read_field() {
   printf '%s' "$INPUT" | python3 -I -c '
@@ -24,7 +26,12 @@ block() { echo "BLOQUEADO pela fábrica: $1" >&2; exit 2; }
 case "$TOOL" in
   Bash)
     CMD="$(read_field tool_input.command)"
-    [[ "$CMD" =~ git[[:space:]]+([^|;&]*[[:space:]])?push ]] && block "git push não é permitido; o merge é local e feito pelo orquestrador."
+    # Push comum é permitido (a fábrica publica a branch do job e abre MR). A regra fica em guard_push.py.
+    if [[ "$CMD" == *push* ]]; then
+      REASON="$(printf '%s' "$INPUT" | python3 -I "$HERE/guard_push.py" 2>/dev/null)"; RC=$?
+      [[ $RC -eq 2 ]] && block "$REASON"
+      [[ $RC -ne 0 && "$CMD" =~ git[[:space:]]+([^|;&]*[[:space:]])?push ]] && block "não consegui analisar este git push (guard_push.py falhou)."
+    fi
     [[ "$CMD" =~ git[[:space:]]+branch[[:space:]]+-[dD][[:space:]]+(master|main)([[:space:]]|$) ]] && block "não apague master/main."
     [[ "$CMD" =~ git[[:space:]]+reset[[:space:]]+--hard[[:space:]]+origin ]] && block "reset --hard para origin não é permitido."
     [[ "$CMD" =~ rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)[a-zA-Z]*[[:space:]]+(/|~|\\\$HOME|\.\.|\*)([[:space:]]|$) ]] && block "rm -rf amplo."

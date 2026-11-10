@@ -16,9 +16,10 @@
   .card { background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:12px; min-width:0; }
   .card h2 { font-size:14px; margin:0 0 6px; word-break:break-word; }
   .pill { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px; border:1px solid currentColor; white-space:nowrap; }
-  .merged,.APPROVE,.PASS { color:var(--ok); } .needs-human,.failed,.CHANGES,.ESCALATE,.FAIL { color:var(--bad); }
+  .mr-open,.merged,.APPROVE,.PASS { color:var(--ok); } .needs-human,.failed,.CHANGES,.ESCALATE,.FAIL { color:var(--bad); }
   .building,.reviewing,.gates,.approving,.spec { color:var(--run); }
   .row { margin:6px 0; color:var(--mut); } .row b { color:var(--fg); font-weight:600; }
+  .row a { color:var(--run); word-break:break-all; }
   details { margin-top:8px; } summary { cursor:pointer; color:var(--mut); }
   pre { white-space:pre-wrap; word-break:break-word; background:var(--bg); border:1px solid var(--bd); border-radius:6px; padding:8px; max-height:320px; overflow:auto; font-size:12px; margin:6px 0 0; }
   .err { color:var(--bad); }
@@ -82,8 +83,9 @@ async function listDir(url) {
 }
 
 // ---------- barra de etapas ----------
-const STAGES = ['INIT', 'SPEC', 'BUILD', 'GATES', 'REVIEW', 'APPROVE', 'MERGE'];
-const BY_STATUS = { init:0, spec:1, building:2, gates:3, reviewing:4, approving:5, merging:6, merged:6 };
+const STAGES = ['INIT', 'SPEC', 'BUILD', 'GATES', 'REVIEW', 'APPROVE', 'MR'];
+const BY_STATUS = { init:0, spec:1, building:2, gates:3, reviewing:4, approving:5 };
+const DONE = ['mr-open', 'merged'];   // 'merged' só existe em jobs de versões antigas da fábrica
 function stageFromAgent(a) {
   if (!a) return 0;
   if (a === 'spec-writer') return 1;
@@ -96,10 +98,10 @@ function stageFromAgent(a) {
 // Retorna { idx, mode } onde mode ∈ run | stop | done
 function currentStage(job, decision) {
   const s = job.status;
-  if (s === 'merged') return { idx: 6, mode: 'done' };
+  if (DONE.includes(s)) return { idx: 6, mode: 'done' };
   if (s in BY_STATUS) return { idx: BY_STATUS[s], mode: 'run' };
   if (s === 'needs-human' || s === 'failed') {
-    if (verdict(decision) === 'APPROVE') return { idx: 6, mode: 'stop' };   // aprovado mas o merge falhou
+    if (verdict(decision) === 'APPROVE') return { idx: 6, mode: 'stop' };   // aprovado, mas o MR não foi aberto
     const evs = job.events || [];
     for (let i = evs.length - 1; i >= 0; i--) { const k = stageFromAgent(evs[i].agent); if (k != null) return { idx: k, mode: 'stop' }; }
     return { idx: 0, mode: 'stop' };
@@ -208,6 +210,15 @@ async function card(id) {
   c.append(stageBar(job, decision));
   const r = $('div', 'row'); r.append('tipo ', $('b', null, job.type), ' · rodada ', $('b', null, `${job.round}/${job.max_rounds}`),
     ' · chamadas ', $('b', null, `${(job.events || []).length}/${job.max_agent_calls}`)); c.append(r);
+  if (job.branch || job.mr) {
+    const br = $('div', 'row');
+    if (job.branch) br.append('branch ', $('b', null, job.branch));
+    if (/^https?:\/\//.test(job.mr || '')) {   // só http(s): o valor vem de um arquivo
+      const a = $('a', null, job.mr); a.href = job.mr; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      br.append(job.branch ? ' · MR ' : 'MR ', a);
+    }
+    c.append(br);
+  }
   if (decision != null) { const d = verdict(decision); const dr = $('div', 'row'); dr.append('decisão ', $('span', 'pill ' + d, d)); c.append(dr); }
 
   // rodadas: diretórios round-N/ existentes ∪ 1..job.round
