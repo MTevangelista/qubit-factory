@@ -64,7 +64,7 @@ INIT (worktree + push da branch + baseline) -> SPEC -> BUILD -> GATES --FAIL--> 
 - **Revisores independentes:** não leem `build.md`; rodam o código e conferem o diff.
 - **Tipos de job:** bug exige teste que falha antes e passa depois; refactor exige caracterização antes e proíbe alterar testes existentes.
 - **Custo:** `max_rounds` e `max_agent_calls` por job (`factory/config.sh`), registro de cada chamada em `job.json`.
-- **Guarda** (`plugins/qubit/hooks/guard.sh`): bloqueia force push, push na branch base, `rm -rf` amplo e edição de gates/hooks/config/perfis dentro de worktrees.
+- **Guarda** (`plugins/qubit/hooks/guard.sh` + `guard_push.py`): bloqueia force push, push na branch base, `rm -rf` amplo e edição de gates/hooks/config/perfis dentro de worktrees.
 - **Resiliência:** revisor sem arquivo válido roda de novo uma vez, depois escala; push que falha tem uma nova tentativa; conflito com a branch base tem uma tentativa de integração pelo builder (merge de `origin/<base>`, nunca rebase), depois escala.
 - **Contexto do orquestrador:** cada agente termina com um bloco `RELATÓRIO` de até 15 linhas; o orquestrador decide por ele e pela primeira linha dos arquivos, sem ler spec, build, reviews nem decision inteiros. Ele também não manda mensagens de "já acabou?" para agentes em andamento.
 - **Saída de build fora do contexto:** agentes com `Bash` usam `factory-gates.sh` (que resume) ou redirecionam build e teste para `factory/jobs/<id>/logs/` e leem só com `rg`, usando o padrão da seção `## Logs` do perfil.
