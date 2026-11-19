@@ -59,6 +59,12 @@ check "orquestrador documenta /qubit init"       grep -q '^## Init' "$SKILL"
 check "orquestrador abre MR em vez de fazer merge" bash -c "grep -q '^### 8. MR' $SKILL && grep -q 'mr-open' $SKILL && ! grep -qE 'merge --no-ff|\| merged \|' $SKILL"
 check "orquestrador nomeia a branch pelo tipo"   bash -c "grep -q '^## Branch do job' $SKILL && grep -q 'feat/003' $SKILL && ! grep -q 'factory/<id>' $SKILL"
 check "orquestrador publica a branch ao criar"   grep -q 'push -u origin "\$BRANCH"' "$SKILL"
+check "orquestrador move o card do Jira no MR"  bash -c "grep -q 'jira_mr_status' $SKILL && grep -q 'transitionJiraIssue' $SKILL && grep -q 'job.json.jira' $SKILL"
+check "falha no Jira não derruba o job"         grep -q 'Falha aqui não muda o job' "$SKILL"
+check "orquestrador limpa jobs mergeados"       bash -c "grep -q '^### 10. LIMPEZA' $SKILL && grep -q '/qubit cleanup' $SKILL && grep -q 'CLEANUP: PENDING' $SKILL"
+check "limpeza só assume merge confirmado"      grep -q 'Nunca passe `--assume-merged` sem essa confirmação' "$SKILL"
+check "info expõe o status do Jira"             grep -q 'jira_mr_status:' scripts/factory-gates.sh
+check "template config.sh tem FACTORY_JIRA_MR_STATUS vazio" grep -qx 'FACTORY_JIRA_MR_STATUS=""' templates/config.sh
 check "builder faz push depois de cada commit"   grep -q 'Depois de cada commit' agents/builder.md
 check "builder nunca força push"                 grep -q 'Proibido: `--force`' agents/builder.md
 for a in $AGENTS; do
@@ -92,7 +98,7 @@ if [[ -f ../../.claude-plugin/marketplace.json ]]; then
 fi
 check "guard.sh executável"                test -x hooks/guard.sh
 check "guard_push.py existe e compila"     python3 -I -c 'import ast,sys;ast.parse(open(sys.argv[1]).read())' hooks/guard_push.py
-for s in factory-gates.sh factory-init.sh factory-selftest.sh; do
+for s in factory-gates.sh factory-init.sh factory-selftest.sh factory-cleanup.sh; do
   check "$s executável e bash válido"       bash -c "test -x scripts/$s && bash -n scripts/$s"
 done
 for f in config.sh lessons.md backlog.md dashboard.html claude-md.md; do
@@ -234,6 +240,46 @@ setcfg FACTORY_TEST_CMD ""
 check "perfil do projeto vence o do plugin"  exit_is 1 bash "$GATES" run "$T"
 check "info aponta o .md do projeto"         bash -c "bash '$GATES' info '$T' | grep -q 'profile_md: .*/factory/profiles/generic.md'"
 rm -rf "$T/factory/profiles"
+
+echo "== Limpeza pós-merge (repo e remoto temporários)"
+CLEAN="$ROOT/scripts/factory-cleanup.sh"
+O="$(mktemp -d)"; R="$(mktemp -d)/app"
+git init -q --bare -b main "$O"
+(
+  mkdir -p "$R" && cd "$R" && git init -q -b main && git config user.email t@t && git config user.name t
+  mkdir -p factory && sed -e 's/__PROFILE__/generic/' -e 's/__BASE__/main/' "$ROOT/templates/config.sh" > factory/config.sh
+  printf 'factory/jobs/*\n*.log\n' > .gitignore && echo base > a.txt && git add -A && git commit -qm base
+  git remote add origin "$O" && git push -q origin main
+  git worktree add -q -b feat/001-a "$R-factory/001-a" main
+  cd "$R-factory/001-a" && echo x > b.txt && git add -A && git commit -qm feat && git push -q -u origin feat/001-a
+)
+mkdir -p "$R/factory/jobs/001-a"
+jobjson() { printf '{"id":"001-a","status":"%s","branch":"%s","mr":"","worktree":"%s"}\n' "$1" "$2" "$R-factory/001-a" > "$R/factory/jobs/001-a/job.json"; }
+jobjson mr-open feat/001-a
+check "pending lista os jobs em mr-open"      bash -c "bash '$CLEAN' pending '$R' | grep -qx '001-a'"
+check "antes do merge: PENDING (exit 3)"      exit_is 3 bash "$CLEAN" job "$R" 001-a
+check "antes do merge: worktree continua"     test -d "$R-factory/001-a"
+(cd "$R" && git merge -q --no-ff feat/001-a -m merge && git push -q origin main)
+echo y > "$R-factory/001-a/c.txt"
+check "worktree sujo: ERRO e não apaga nada"  bash -c "bash '$CLEAN' job '$R' 001-a | head -1 | grep -qx 'CLEANUP: ERRO' && test -d '$R-factory/001-a'"
+rm "$R-factory/001-a/c.txt"; echo log > "$R-factory/001-a/build.log"
+check "depois do merge: DONE (exit 0)"        exit_is 0 bash "$CLEAN" job "$R" 001-a
+check "remove o worktree (com ignorados)"     bash -c "! test -d '$R-factory/001-a'"
+check "remove a pasta de worktrees vazia"     bash -c "! test -d '$R-factory'"
+check "apaga a branch local do job"           bash -c "! git -C '$R' rev-parse -q --verify refs/heads/feat/001-a"
+check "apaga a branch remota do job"          bash -c "! git -C '$R' ls-remote --exit-code --heads origin feat/001-a"
+check "rodar de novo é inofensivo"            bash -c "bash '$CLEAN' job '$R' 001-a | head -1 | grep -qE 'CLEANUP: (DONE|PENDING)'"
+jobjson mr-open main
+check "recusa apagar a branch base"           bash -c "bash '$CLEAN' job '$R' 001-a --assume-merged | head -1 | grep -qx 'CLEANUP: ERRO' && git -C '$R' ls-remote --exit-code --heads origin main"
+jobjson merged feat/001-a
+check "pending ignora jobs já limpos"         bash -c "[[ -z \$(bash '$CLEAN' pending '$R') ]]"
+DD="$(mktemp -d)"; mkdir -p "$DD/App-aaa" "$DD/App-bbb"
+python3 -I -c 'import plistlib,sys; plistlib.dump({"WorkspacePath":sys.argv[2]},open(sys.argv[1],"wb"))' "$DD/App-aaa/info.plist" "/x/app-factory/001-a/App.xcodeproj"
+python3 -I -c 'import plistlib,sys; plistlib.dump({"WorkspacePath":sys.argv[2]},open(sys.argv[1],"wb"))' "$DD/App-bbb/info.plist" "/x/app/App.xcodeproj"
+if [[ -x /usr/libexec/PlistBuddy ]] || command -v plutil >/dev/null 2>&1; then
+  check "ios: apaga o DerivedData do worktree"  bash -c "source profiles/ios.sh; FACTORY_DERIVED_DATA='$DD' factory_cleanup_caches /x/app-factory/001-a >/dev/null; ! test -d '$DD/App-aaa' && test -d '$DD/App-bbb'"
+fi
+rm -rf "$O" "$(dirname "$R")" "$DD"
 
 echo "== Init (repo temporário)"
 INIT="$ROOT/scripts/factory-init.sh"

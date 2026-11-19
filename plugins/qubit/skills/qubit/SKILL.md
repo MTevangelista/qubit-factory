@@ -1,6 +1,6 @@
 ---
 name: qubit
-description: Software factory independente de linguagem (a stack vem do perfil em factory/config.sh). Use para rodar um job completo (spec, build, gates, revisão, aprovação, abertura de MR) de uma feature, bug ou refactor, ou para instalar a fábrica num projeto. Comandos - /qubit init [perfil], /qubit <descrição>, /qubit --bug|--refactor <descrição>, /qubit next, /qubit status, /qubit approve <job-id>, /qubit rework <job-id> <nota>.
+description: Software factory independente de linguagem (a stack vem do perfil em factory/config.sh). Use para rodar um job completo (spec, build, gates, revisão, aprovação, abertura de MR) de uma feature, bug ou refactor, ou para instalar a fábrica num projeto. Comandos - /qubit init [perfil], /qubit [JIRA-123] <descrição>, /qubit --bug|--refactor <descrição>, /qubit next, /qubit status, /qubit approve <job-id>, /qubit rework <job-id> <nota>, /qubit cleanup [job-id].
 ---
 
 # Orquestrador da fábrica
@@ -20,7 +20,7 @@ Regras gerais:
 1. `$FACTORY_HOME` = raiz da fábrica, duas pastas acima do diretório desta skill (o "Base directory" que o Claude Code mostra ao carregá-la). Resolva links: `FACTORY_HOME="$(cd -P "<base directory>" && cd ../.. && pwd)"`.
 2. Exceto em `/qubit init`, rode `bash "$FACTORY_HOME/scripts/factory-gates.sh" info "$REPO"`.
    - `INFO: ERRO`: mostre as linhas ao usuário e pare. Se faltar `factory/config.sh`, sugira `/qubit init`.
-   - `INFO`: guarde `$BASE` (linha `base:`), `$WTROOT` (`worktrees:`), `$PROFILE` (`profile_md:`) e `$GATES` (`gates:`). Não invente esses valores.
+   - `INFO`: guarde `$BASE` (linha `base:`), `$WTROOT` (`worktrees:`), `$PROFILE` (`profile_md:`), `$GATES` (`gates:`) e `$JIRA_MR_STATUS` (`jira_mr_status:`, pode vir vazio). Não invente esses valores. O script de limpeza é `$CLEANUP` = `$FACTORY_HOME/scripts/factory-cleanup.sh`.
 - Responda ao usuário em português.
 
 ## Antes de começar: modelo da sessão
@@ -47,10 +47,11 @@ O seu contexto precisa durar o job inteiro, com várias rodadas. Por isso:
 | Comando | Ação |
 |---|---|
 | `/qubit init [perfil]` | Instala a fábrica no projeto atual (veja **Init**). Não roda job. |
-| `/qubit <desc>` | Novo job. Tipo inferido (feature, bug, refactor) ou forçado com `--bug` / `--refactor` / `--feature`. |
-| `/qubit next` | Pega o primeiro item `- [ ]` de `factory/backlog.md`, marca `- [~] <job-id>` e roda. |
+| `/qubit <desc>` | Novo job. Tipo inferido (feature, bug, refactor) ou forçado com `--bug` / `--refactor` / `--feature`. Card do Jira opcional (veja **Card do Jira**). Antes do INIT, faça a **varredura de limpeza**. |
+| `/qubit next` | Pega o primeiro item `- [ ]` de `factory/backlog.md`, marca `- [~] <job-id>` e roda. Antes do INIT, faça a **varredura de limpeza**. |
 | `/qubit status` | Lista jobs (id, tipo, status, rodada, chamadas de agente, link do MR). Só lê `job.json`. |
 | `/qubit approve <id>` | Só para `needs-human`: é a aprovação da pessoa para **abrir o MR** (roda o passo MR). Não faz merge. |
+| `/qubit cleanup [id]` | Limpa jobs cujo MR já foi mergeado (veja **10. LIMPEZA**). Sem `id`, varre todos os jobs em `mr-open`. |
 | `/qubit rework <id> <nota>` | Para `needs-human` ou `mr-open` (ex.: mudança pedida no review do MR): grava a nota em `human-note.md`, zera `round`, volta ao passo BUILD. Se o worktree já foi removido, recrie-o antes: `git worktree add "$WT" "$BRANCH"`. |
 
 ## `job.json`
@@ -60,25 +61,32 @@ O seu contexto precisa durar o job inteiro, com várias rodadas. Por isso:
   "id": "003-login-biometrico",
   "type": "feature | bug | refactor",
   "title": "...",
-  "status": "spec | building | gates | reviewing | approving | mr-open | needs-human | failed",
+  "status": "spec | building | gates | reviewing | approving | mr-open | needs-human | failed | merged",
   "round": 0,
   "max_rounds": 2,
   "max_agent_calls": 20,
   "branch": "feat/003-login-biometrico",
   "mr": "",
+  "jira": "",
   "worktree": "/caminho/meu-app-factory/003-login-biometrico",
   "reviewers": [],
   "events": [{"at": "ISO-8601", "agent": "builder", "model": "claude-opus-5-5", "effort": "high", "round": 1, "note": ""}]
 }
 ```
 
-`mr` guarda a URL do MR depois de aberto. Atualize `job.json` a cada transição. Cada chamada de agente vira um item em `events`. **Se `len(events) >= max_agent_calls`, pare**: status `needs-human`, motivo em `decision.md` escrito por você (primeira linha `ESCALATE`).
+`mr` guarda a URL do MR depois de aberto. `jira` guarda a chave do card (ex.: `ABC-123`), vazia se o job não veio do Jira. `merged` é o status final, gravado pela LIMPEZA. Atualize `job.json` a cada transição. Cada chamada de agente vira um item em `events`. **Se `len(events) >= max_agent_calls`, pare**: status `needs-human`, motivo em `decision.md` escrito por você (primeira linha `ESCALATE`).
 
 ## Init
 `/qubit init [perfil]` prepara o projeto atual para a fábrica. Não cria job nem worktree.
 1. Rode `bash "$FACTORY_HOME/scripts/factory-init.sh" "$REPO" [perfil]`. Sem perfil, o script detecta a stack.
 2. Mostre a saída como veio. Ela lista o que foi criado, o que já existia (nunca sobrescreve) e o resultado do `info`.
 3. Diga ao usuário o que falta ser feito por uma pessoa: preencher as seções `_preencher_` do `CLAUDE.md`, revisar `factory/config.sh` (no `ios`, `FACTORY_SCHEME`) e fazer commit desses arquivos na branch base, já publicada no remoto, antes do primeiro job (o worktree nasce da branch base, então a config precisa estar commitada; commit da base que não estiver no remoto entraria no MR do job). O projeto também precisa de um remoto `origin` e, para abrir o MR, da CLI do host (`gh` ou `glab`) autenticada.
+
+## Card do Jira
+O pedido pode trazer um card: `/qubit [--bug|--refactor|--feature] ABC-123 [descrição]`, ou a URL do card (`https://<site>.atlassian.net/browse/ABC-123`). A chave é o primeiro token no formato `[A-Z][A-Z0-9]+-[0-9]+` (ou o fim da URL `/browse/<chave>`); grave-a em `job.json.jira`. Item do backlog também pode começar com a chave.
+- **Só a chave, sem descrição:** busque o card com a ferramenta do Jira da sua lista (Atlassian MCP: `getJiraIssue`; o `cloudId` vem de `getAccessibleAtlassianResources`) e grave o resumo e a descrição em `$JOB/jira.md`. Esse arquivo é a descrição que vai para o `spec-writer`. Sem a ferramenta, pare e peça a descrição ao usuário.
+- **Chave e descrição:** a descrição do usuário vale; a chave só serve para mover o card (passo MR) e entra na descrição do MR.
+- Sem card, o job segue igual e o Jira não é tocado.
 
 ## Branch do job
 `$BRANCH` = `<prefixo>/<job-id>`, no padrão conventional commits. O prefixo vem do tipo do job:
@@ -148,20 +156,36 @@ Você abre o MR de `$BRANCH` para `$BASE`. Você **não faz merge**, nem local n
 3. **MR já aberto** (`job.json.mr` preenchido, job que voltou por `rework`): não abra outro; o push do item 1 já atualizou o MR. Pule para o item 6.
 4. **Título e corpo:**
    - Título: `<prefixo>(<escopo>): <resumo>`, em inglês, no imperativo (traduza o título do job se preciso). O prefixo é o da branch; o escopo é a área afetada em uma palavra (na dúvida, o slug do job).
-   - Corpo: monte por shell, **sem ler** os arquivos: `{ printf 'Job `%s` (%s), branch `%s`.\nAprovação: %s.\n\n' "<id>" "<tipo>" "$BRANCH" "<approver | pessoa, via /qubit approve>"; tail -n +2 "$JOB/decision.md"; } > "$JOB/mr-body.md"`.
+   - Corpo: monte por shell, **sem ler** os arquivos: `{ printf 'Job `%s` (%s), branch `%s`.\nAprovação: %s.\n' "<id>" "<tipo>" "$BRANCH" "<approver | pessoa, via /qubit approve>"; [ -n "<jira>" ] && printf 'Jira: %s\n' "<jira>"; printf '\n'; tail -n +2 "$JOB/decision.md"; } > "$JOB/mr-body.md"`.
 5. **Abra o MR** conforme o host de `git -C "$REPO" remote get-url origin`:
    - GitHub: `gh pr create --base "$BASE" --head "$BRANCH" --title "<título>" --body-file "$JOB/mr-body.md"`.
    - GitLab: `glab mr create --source-branch "$BRANCH" --target-branch "$BASE" --title "<título>" --description "$(cat "$JOB/mr-body.md")" --yes`.
    - Sem a CLI do host: use a ferramenta de criar MR/PR desse host que estiver na sua lista de ferramentas (MCP), com os mesmos título, corpo, origem e destino.
    - Sem nenhuma das duas, ou se a criação falhar: status `needs-human`. Mostre o erro e diga à pessoa que a branch já está publicada e que basta abrir o MR à mão (título e `mr-body.md` prontos) ou instalar a CLI e rodar `/qubit approve <id>`.
 6. **Sucesso:** grave a URL em `job.json.mr`, status `mr-open`, mostre a URL ao usuário, remova o worktree (`git worktree remove "$WT"`; a branch continua local e no remoto) e marque `- [x]` no backlog se veio de `next`.
+7. **Card do Jira** (só se `job.json.jira` e `$JIRA_MR_STATUS` estiverem preenchidos): mova o card para o status `$JIRA_MR_STATUS` com a ferramenta do Jira da sua lista (Atlassian MCP):
+   - `getTransitionsForJiraIssue` no card; escolha a transição cujo destino (`to.name`) ou nome é igual a `$JIRA_MR_STATUS`, sem diferenciar maiúsculas e espaços nas pontas. Se o card já estiver nesse status, não faça nada.
+   - `transitionJiraIssue` com o id dessa transição.
+   - Grave o resultado em `job.json.jira_moved`: o nome do status, ou `erro: <motivo>`. Não é chamada de agente: não entra em `events`.
+   - **Falha aqui não muda o job:** o MR já está aberto e o status continua `mr-open`. Sem ferramenta do Jira, sem transição com esse nome (o workflow do board não permite ir direto para lá) ou erro da API: avise o usuário em uma linha, com os nomes das transições disponíveis, e siga.
+   - Num `rework` de job com MR aberto, este item roda de novo (o card pode ter voltado de coluna no review).
 
-Review, CI e merge do MR acontecem no remoto e são de uma pessoa. Mudança pedida no review volta pela fábrica com `/qubit rework <id> <nota>`.
+Review, CI e merge do MR acontecem no remoto e são de uma pessoa. Mudança pedida no review volta pela fábrica com `/qubit rework <id> <nota>`. Depois do merge, o lixo do job sai na LIMPEZA.
 
 ### 9. APRENDER
 Depois de `mr-open` ou `needs-human`, **não leia** os reviews você mesmo. Spawne `learner` (`claude-sonnet-5-5`, só leitura) com o caminho do job, de `factory/jobs/` e de `factory/lessons.md`. Registre a chamada em `events`; ela roda mesmo com `max_agent_calls` atingido.
 - `resultado: NENHUMA`: nada a fazer.
 - `resultado: LICOES`: acrescente ao fim de `factory/lessons.md`, na raiz do repo, cada linha do relatório que começa com `- `, como veio (`printf '%s\n' '<linha>' >> factory/lessons.md`).
+
+### 10. LIMPEZA (depois do merge, determinística)
+A fábrica não sabe sozinha quando o MR foi mergeado. Ela confere em dois momentos: no `/qubit cleanup [id]` e na **varredura de limpeza**, no começo de `/qubit <desc>` e `/qubit next`.
+1. **Quais jobs:** com `id`, só ele; sem `id` (ou na varredura), `bash "$CLEANUP" pending "$REPO"` lista os jobs em `mr-open`, um por linha.
+2. **Para cada job:** `bash "$CLEANUP" job "$REPO" <id> > "$JOB/cleanup.md" 2>&1` e leia só `head -1`. O script confirma o merge (CLI do host ou `git`) e só então apaga o worktree, a branch local, a branch remota (nunca a base) e os caches do perfil fora do worktree (no `ios`, o DerivedData do worktree). A pasta do job fica, como histórico.
+   - `CLEANUP: DONE`: status `merged` em `job.json`.
+   - `CLEANUP: PENDING`: MR ainda aberto ou merge não confirmado. Se o host não tem CLI mas você tem a ferramenta MCP do host (ex.: `get_merge_request` do GitLab), confira o estado do MR por ela; se estiver mergeado, rode de novo com `--assume-merged`. Nunca passe `--assume-merged` sem essa confirmação.
+   - `CLEANUP: CLOSED`: MR fechado sem merge. Não apague nada; avise o usuário (o job foi abandonado?).
+   - `CLEANUP: ERRO`: mostre `cleanup.md` ao usuário (ex.: worktree com mudanças não commitadas). Nada foi apagado.
+3. Na varredura, mostre ao usuário uma linha por job limpo (`<id>: limpo`) e siga para o INIT; `PENDING` não é avisado. A varredura não gasta chamadas de agente nem para o job novo se algo falhar.
 
 ## Tipos de job
 
@@ -171,4 +195,4 @@ Depois de `mr-open` ou `needs-human`, **não leia** os reviews você mesmo. Spaw
 
 ## Quando parar e perguntar ao usuário
 
-Dúvidas bloqueantes no spec, estouro de `max_agent_calls`, revisor que falha duas vezes, push que falha, conflito persistente com a base, MR que não pôde ser aberto, `ESCALATE`. Mostre: o `job-id`, o motivo e o caminho do arquivo relevante. Nunca faça merge, nunca force push, nunca faça push na branch base.
+Dúvidas bloqueantes no spec, estouro de `max_agent_calls`, revisor que falha duas vezes, push que falha, conflito persistente com a base, MR que não pôde ser aberto, `ESCALATE`. Mostre: o `job-id`, o motivo e o caminho do arquivo relevante. Nunca faça merge, nunca force push, nunca faça push na branch base. Branch remota de job só é apagada pelo script de limpeza, depois do merge confirmado.

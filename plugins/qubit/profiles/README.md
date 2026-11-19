@@ -31,6 +31,8 @@ Cada perfil tem dois arquivos:
 | `FACTORY_PROFILE_ERROR` | mensagem de erro de configuração (ex.: scheme ausente); faz o gate falhar |
 | `FACTORY_PERMISSIONS` | regras de permissão do Claude Code, separadas por `;`, que o `/qubit init` adiciona em `.claude/settings.json` (ex.: `Bash(xcodebuild:*)`) |
 
+Opcional: a função `factory_cleanup_caches <worktree>`. O `factory-cleanup.sh` a chama depois do merge de um job para apagar caches que a stack cria **fora** do worktree para aquele caminho (o que fica dentro do worktree some junto com ele). Imprima uma linha por item removido. Exemplo: o `ios.sh` apaga a pasta do DerivedData do Xcode cujo `WorkspacePath` está dentro do worktree.
+
 Os revisores de UI e UX só rodam quando `factory-gates.sh ui <wt>` responde `UI: yes`. Perfil sem as duas regex nunca chama esses revisores.
 
 ## Contrato do `<perfil>.md`

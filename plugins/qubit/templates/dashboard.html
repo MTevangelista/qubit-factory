@@ -85,7 +85,7 @@ async function listDir(url) {
 // ---------- barra de etapas ----------
 const STAGES = ['INIT', 'SPEC', 'BUILD', 'GATES', 'REVIEW', 'APPROVE', 'MR'];
 const BY_STATUS = { init:0, spec:1, building:2, gates:3, reviewing:4, approving:5 };
-const DONE = ['mr-open', 'merged'];   // 'merged' só existe em jobs de versões antigas da fábrica
+const DONE = ['mr-open', 'merged'];   // merged: MR mergeado e job limpo (/qubit cleanup)
 function stageFromAgent(a) {
   if (!a) return 0;
   if (a === 'spec-writer') return 1;

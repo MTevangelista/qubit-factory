@@ -11,6 +11,11 @@ FACTORY_PROFILE="ios"
 # --- Repositório ---
 FACTORY_BASE_BRANCH="master"            # de onde nascem os worktrees e alvo do MR; vazio = origin/HEAD, master ou main
 
+# --- Jira (opcional) ---
+# Status (coluna) para onde o card do job vai quando o MR abre. Vazio = a fábrica não mexe no Jira.
+# O card vem do pedido: /qubit ABC-123 <descrição> (ou só /qubit ABC-123, e o card vira a descrição).
+FACTORY_JIRA_MR_STATUS="PP Code Review"
+
 # --- Comandos dos gates (vazio = usa o padrão detectado pelo perfil) ---
 # Cada comando roda com `bash -c` na raiz do worktree.
 FACTORY_SETUP_CMD=""                    # instala dependências (ex.: "npm ci"); roda antes de tudo
