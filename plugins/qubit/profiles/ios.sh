@@ -38,3 +38,18 @@ elif [[ -f Package.swift ]]; then
   [[ -z "${FACTORY_TEST_CMD:-}"  ]] && FACTORY_TEST_CMD="swift test"
 fi
 unset _ios_xc _ios_ws _ios_pj _ios_base
+
+# Limpeza pós-merge (factory-cleanup.sh): o Xcode cria um DerivedData por caminho de projeto, então cada
+# worktree deixa uma pasta própria em ~/Library/Developer/Xcode/DerivedData. Apaga só as do worktree do job.
+factory_cleanup_caches() { # factory_cleanup_caches <caminho-do-worktree>
+  local wt="$1" dd="${FACTORY_DERIVED_DATA:-$HOME/Library/Developer/Xcode/DerivedData}" d wp
+  [[ -n "$wt" && -d "$dd" ]] || return 0
+  for d in "$dd"/*/; do
+    [[ -f "$d/info.plist" ]] || continue
+    wp="$(/usr/libexec/PlistBuddy -c 'Print :WorkspacePath' "$d/info.plist" 2>/dev/null \
+       || plutil -extract WorkspacePath raw -o - "$d/info.plist" 2>/dev/null)" || continue
+    if [[ "$wp" == "$wt"/* ]]; then
+      rm -rf "${d%/}" && echo "cache removido: ${d%/}"
+    fi
+  done
+}

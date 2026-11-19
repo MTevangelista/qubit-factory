@@ -78,7 +78,7 @@ Instalada como plugin, a skill pode aparecer como `/qubit:qubit` e os agentes co
 
 > A imagem é um SVG versionado em [`docs/images/factory-flow.svg`](docs/images/factory-flow.svg). Ao mudar o fluxo em `plugins/qubit/skills/qubit/SKILL.md`, atualize a imagem junto.
 
-Status possíveis de um job (`job.json.status`): `spec` → `building` → `gates` → `reviewing` → `approving` → `mr-open`, ou `needs-human` / `failed`. Com o MR aberto, `job.json.mr` guarda o link.
+Status possíveis de um job (`job.json.status`): `spec` → `building` → `gates` → `reviewing` → `approving` → `mr-open` → `merged`, ou `needs-human` / `failed`. Com o MR aberto, `job.json.mr` guarda o link; `merged` só aparece depois da limpeza pós-merge.
 
 ---
 
@@ -93,8 +93,9 @@ Status possíveis de um job (`job.json.status`): `spec` → `building` → `gate
 | 5 | **REVIEW** | revisores em paralelo | diff + código (sem `build.md`) | `round-<n>/review-<nome>.md` (`VERDICT: PASS/CHANGES`) | DECIDIR |
 | 6 | **DECIDIR** | orquestrador | primeira linha de cada review | — | todos `PASS` → APPROVE · `CHANGES` → BUILD (ou APPROVE na última rodada) |
 | 7 | **APPROVE** | `approver` + gates finais | spec, todas as rodadas, baseline | `decision.md` (`APPROVE`/`ESCALATE`), `final-gates.md` | MR ou `needs-human` |
-| 8 | **MR** | orquestrador | branch do job, `decision.md` | MR da branch do job para a branch base (`gh`/`glab`), link em `job.json.mr` | `mr-open`, ou `needs-human` se o MR não abrir ou houver conflito persistente com a base |
+| 8 | **MR** | orquestrador | branch do job, `decision.md` | MR da branch do job para a branch base (`gh`/`glab`), link em `job.json.mr`; card do Jira movido para `FACTORY_JIRA_MR_STATUS` | `mr-open`, ou `needs-human` se o MR não abrir ou houver conflito persistente com a base |
 | 9 | **APRENDER** | `learner` (só leitura) | job atual + jobs anteriores | linhas novas em `lessons.md` | fim |
+| 10 | **LIMPEZA** | `factory-cleanup.sh` (sem LLM) | jobs em `mr-open` | merge confirmado → worktree, branch local, branch remota e caches do perfil apagados | `merged`; MR ainda aberto → nada muda |
 
 **Quais revisores rodam:**
 
@@ -108,7 +109,11 @@ Status possíveis de um job (`job.json.status`): `spec` → `building` → `gate
 
 **Branch do job:** `<type>/<job-id>`, com `type` = `feat` (feature), `fix` (bug) ou `refactor`.
 
-**Título do MR:** `type(<escopo>): <resumo>` em inglês, no imperativo, com o mesmo `type`. A descrição vem de `decision.md` (critérios de aceitação, rodadas e motivo).
+**Título do MR:** `type(<escopo>): <resumo>` em inglês, no imperativo, com o mesmo `type`. A descrição vem de `decision.md` (critérios de aceitação, rodadas e motivo) e cita o card do Jira, se houver.
+
+**Card do Jira:** comece o pedido com a chave (`/qubit ABC-123 <descrição>`) ou a URL do card. Só a chave, sem descrição, faz o orquestrador ler o card no Jira e usá-lo como descrição. Quando o MR abre (por `APPROVE` ou `/qubit approve`), o card vai para o status de `FACTORY_JIRA_MR_STATUS` (aqui `PP Code Review`), pela ferramenta do Jira (Atlassian MCP). Falha no Jira não derruba o job: o MR continua aberto e a fábrica avisa em uma linha, com as transições disponíveis.
+
+**Limpeza depois do merge:** a fábrica não é avisada do merge; ela confere no `/qubit cleanup` e no começo de cada `/qubit <descrição>` e `/qubit next`. O merge é confirmado pela CLI do host (`gh`/`glab`) ou pelo `git` (a branch já está em `origin/<base>`); squash merge sem CLI fica pendente até o orquestrador confirmar pela ferramenta MCP do host. Confirmado o merge, saem o worktree, a branch local, a branch remota (se o host não apagou) e os caches do perfil fora do worktree (no `ios`, o DerivedData do worktree). A pasta `factory/jobs/<id>` fica como histórico. MR fechado sem merge não é limpo.
 
 ---
 
@@ -120,6 +125,7 @@ Status possíveis de um job (`job.json.status`): `spec` → `building` → `gate
 |---|---|
 | `/qubit init [perfil]` | Prepara o projeto para a fábrica (config, arquivos, permissões). Veja [Usar em outro projeto](#usar-em-outro-projeto). |
 | `/qubit <descrição>` | Novo job; o tipo (feature, bug, refactor) é inferido da descrição. |
+| `/qubit ABC-123 [descrição]` | Novo job ligado a um card do Jira; sem descrição, o card vira a descrição. Quando o MR abre, o card vai para `FACTORY_JIRA_MR_STATUS`. |
 | `/qubit --feature <descrição>` | Força o tipo feature. |
 | `/qubit --bug <descrição>` | Força bug: exige teste de regressão que falha antes e passa depois. |
 | `/qubit --refactor <descrição>` | Força refactor: sem mudar comportamento nem alterar testes existentes. |
@@ -127,6 +133,7 @@ Status possíveis de um job (`job.json.status`): `spec` → `building` → `gate
 | `/qubit status` | Lista os jobs: id, tipo, status, rodada, chamadas de agente e link do MR. |
 | `/qubit approve <job-id>` | Para um job em `needs-human`: é a sua aprovação para **abrir o MR**, depois de revisar. Não faz merge. |
 | `/qubit rework <job-id> <nota>` | Grava sua nota em `human-note.md`, zera a rodada e devolve ao builder. Vale para `needs-human` e para `mr-open` (os commits novos entram no mesmo MR). |
+| `/qubit cleanup [job-id]` | Limpa os jobs cujo MR já foi mergeado (worktree, branches e caches); status `merged`. Sem `job-id`, confere todos os jobs em `mr-open`. |
 
 ### Exemplos
 
@@ -224,7 +231,7 @@ A fábrica é autônoma no caminho feliz. Ela **para com status `needs-human`** 
 - **Alterar as regras da fábrica:** `.claude/`, `plugins/qubit/`, `factory/config.sh`, `factory/profiles/`, `factory/lessons.md` e `CLAUDE.md`. O hook impede os agentes de mexer nesses arquivos dentro dos worktrees.
 - **Revisar e fazer o merge do MR:** a fábrica abre o MR e para. Aprovar, pedir mudanças (`/qubit rework`) e fazer o merge no remoto é com você.
 - **Curar as lições:** o `learner` acrescenta linhas a `lessons.md`; revise de vez em quando e remova o que não fizer mais sentido.
-- **Abandonar um job:** não há comando; feche o MR (se houver) e remova o worktree e a branch, local e remota:
+- **Abandonar um job:** não há comando (a limpeza automática só roda depois de merge); feche o MR (se houver) e remova o worktree e a branch, local e remota:
 
 ```bash
 git worktree remove ../<repo>-factory/<job-id>
@@ -287,10 +294,12 @@ factory/jobs/004-onboarding/
 ├── decision.md         # APPROVE ou ESCALATE + motivo
 ├── final-gates.md      # gates no estado final
 ├── mr-body.md          # descrição do MR (montada a partir de decision.md)
+├── jira.md             # card do Jira, quando o pedido foi só a chave
+├── cleanup.md          # resultado da limpeza pós-merge
 └── logs/               # saída completa de build e testes
 ```
 
-O worktree do job fica fora do repo, em `../<repo>-factory/<job-id>`, e é removido depois que o MR é aberto (um `/qubit rework` recria o worktree a partir da branch do job).
+O worktree do job fica fora do repo, em `../<repo>-factory/<job-id>`, e é removido depois que o MR é aberto (um `/qubit rework` recria o worktree a partir da branch do job). A branch local e a remota saem na limpeza, depois do merge.
 
 O **dashboard** (`factory/dashboard.html`) lê esses arquivos e mostra etapas, linha do tempo e abas por rodada. Sirva a pasta `factory` com `python3 -m http.server -d factory 8000`.
 
@@ -323,6 +332,7 @@ Para outra stack (Go, Rust, Flutter...), copie `generic.sh`/`generic.md`, preenc
 |---|---|---|
 | `FACTORY_PROFILE` | `ios` | perfil de stack (`plugins/qubit/profiles/<perfil>.sh` + `.md`; `factory/profiles/` do projeto vence) |
 | `FACTORY_BASE_BRANCH` | `master` | de onde os worktrees nascem e alvo do MR; vazio = `origin/HEAD`, `master` ou `main` |
+| `FACTORY_JIRA_MR_STATUS` | `PP Code Review` | status (coluna) do card do Jira quando o MR abre; vazio = não mexe no Jira |
 | `FACTORY_SETUP_CMD` | vazio (perfil) | instala dependências antes dos gates |
 | `FACTORY_LINT_CMD` / `FACTORY_FORMAT_CMD` / `FACTORY_TYPECHECK_CMD` | vazio (perfil) | opcionais; binário ausente = pulado |
 | `FACTORY_BUILD_CMD` | vazio (perfil) | opcional em linguagens interpretadas |

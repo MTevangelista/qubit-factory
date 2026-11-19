@@ -5,7 +5,7 @@
 #   factory-gates.sh run      <dir-do-worktree>   # PASS/FAIL; falha se algo quebrar
 #   factory-gates.sh baseline <dir-do-worktree>   # só registra o estado inicial; sai sempre 0
 #   factory-gates.sh ui       <dir-do-worktree>   # "UI: yes" | "UI: no" (o diff toca interface?)
-#   factory-gates.sh info     <raiz-do-repo>      # caminhos e branch que o orquestrador usa; sai 1 se a config estiver errada
+#   factory-gates.sh info     <raiz-do-repo>      # caminhos, branch e status do Jira que o orquestrador usa; sai 1 se a config estiver errada
 #
 # Os comandos vêm de factory/config.sh do projeto; o que estiver vazio lá recebe o padrão do perfil.
 # Perfil: factory/profiles/<FACTORY_PROFILE>.sh do projeto, se existir; senão o do plugin (profiles/).
@@ -45,6 +45,7 @@ HAS_CONFIG=0
 : "${GATE_TIMEOUT_SECONDS:=1800}"
 : "${FACTORY_ALLOW_NO_PROJECT:=0}"
 : "${FACTORY_REQUIRE_TOOLS:=0}"
+: "${FACTORY_JIRA_MR_STATUS:=}"
 FACTORY_PROFILE_ERROR=""
 FACTORY_SOURCE_EXTS=""
 FACTORY_UI_PATH_REGEX=""
@@ -102,6 +103,7 @@ if [[ "$MODE" == "info" ]]; then
   echo "profile_md: $PROFILE_MD"
   echo "gates: $FACTORY_HOME/scripts/factory-gates.sh"
   echo "factory_home: $FACTORY_HOME"
+  echo "jira_mr_status: $FACTORY_JIRA_MR_STATUS"
   exit 0
 fi
 
