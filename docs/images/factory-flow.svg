@@ -140,11 +140,11 @@
   <text x="978" y="1043" class="s" text-anchor="end">→ volta ao BUILD</text>
 
   <line x1="400" y1="1070" x2="400" y2="1108" class="e"/>
-  <text x="410" y="1094" class="l">PASS</text>
+  <text x="410" y="1094" class="l">PASS → approving (espera você)</text>
 
   <!-- 8 MR -->
   <rect x="250" y="1110" width="300" height="68" rx="10" class="step"/>
-  <text x="400" y="1134" class="t" text-anchor="middle">8 · MR</text>
+  <text x="400" y="1134" class="t" text-anchor="middle">8 · MR (só com /qubit approve)</text>
   <text x="400" y="1153" class="s" text-anchor="middle">abre o MR (gh ou glab) · não faz merge</text>
   <text x="400" y="1170" class="s" text-anchor="middle">card do Jira → FACTORY_JIRA_MR_STATUS</text>
 

@@ -1,6 +1,6 @@
 {
   "name": "qubit",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Software factory independente de linguagem: /qubit roda spec, build, gates, revisão por especialistas, aprovação e abertura de MR para features, bugs e refactors.",
   "author": { "name": "Matheus Evangelista" },
   "keywords": ["factory", "agents", "code-review", "worktree"]

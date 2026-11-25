@@ -57,6 +57,7 @@ check "orquestrador usa o info dos gates"        grep -q 'factory-gates.sh" info
 check "orquestrador sem repo ou branch fixos"    bash -c "! grep -qE 'qubit-factory|[^_]master' $SKILL"
 check "orquestrador documenta /qubit init"       grep -q '^## Init' "$SKILL"
 check "orquestrador abre MR em vez de fazer merge" bash -c "grep -q '^### 8. MR' $SKILL && grep -q 'mr-open' $SKILL && ! grep -qE 'merge --no-ff|\| merged \|' $SKILL"
+check "MR só abre com /qubit approve (não logo após APPROVE)" bash -c "grep -q 'status\` = \`approving\`' $SKILL && grep -q '^### 8. MR (só com \`/qubit approve <id>\`' $SKILL && ! grep -q 'MR (só com .APPROVE., ou' $SKILL"
 check "orquestrador nomeia a branch pelo tipo"   bash -c "grep -q '^## Branch do job' $SKILL && grep -q 'feat/003' $SKILL && ! grep -q 'factory/<id>' $SKILL"
 check "orquestrador publica a branch ao criar"   grep -q 'push -u origin "\$BRANCH"' "$SKILL"
 check "orquestrador move o card do Jira no MR"  bash -c "grep -q 'jira_mr_status' $SKILL && grep -q 'transitionJiraIssue' $SKILL && grep -q 'job.json.jira' $SKILL"

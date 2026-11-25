@@ -17,5 +17,5 @@ Este repo usa a fábrica `/qubit` (plugin `qubit`): um pedido vira spec, build n
 - Agentes **não** alteram `.claude/`, `factory/config.sh`, `factory/profiles/`, `factory/lessons.md` nem este arquivo dentro de um worktree (o hook do plugin bloqueia). Quem muda isso é uma pessoa.
 - Branch do job no padrão conventional commits: `<type>/<job-id>` (`feat/`, `fix/`, `refactor/`), criada a partir da branch base (`FACTORY_BASE_BRANCH`).
 - `git push` é permitido **só na branch do job**: push logo depois de criar a branch e depois de cada commit. Nunca force push e nunca push direto na branch base (o hook do plugin bloqueia os dois).
-- A fábrica **não faz merge**. Depois do `APPROVE` (ou de `/qubit approve <job-id>`), o orquestrador abre o MR da branch do job para a branch base; o merge é de uma pessoa, no remoto.
+- A fábrica **não faz merge**. Depois do `APPROVE` o job fica aguardando a pessoa; o orquestrador só abre o MR da branch do job para a branch base com `/qubit approve <job-id>`. O merge é de uma pessoa, no remoto.
 <!-- qubit:end -->

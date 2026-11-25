@@ -68,7 +68,7 @@ Instalada como plugin, a skill pode aparecer como `/qubit:qubit` e os agentes co
 2. **Isolamento.** Cada job roda num `git worktree` próprio (`../<repo>-factory/<job-id>`) na branch `<type>/<job-id>`, no padrão conventional commits (`feat/`, `fix/` ou `refactor/`; ex.: `feat/003-login-biometrico`).
 3. **Verificação barata primeiro.** Gates determinísticos rodam antes de qualquer revisor; falha de gate não gasta LLM.
 4. **Revisão independente.** Revisores não leem o relato do builder: conferem o diff e rodam o código.
-5. **O merge é de uma pessoa.** A fábrica publica a branch do job (push ao criar a branch e depois de cada commit) e, com `APPROVE`, abre o MR. Ela nunca faz merge, nunca faz force push e nunca faz push na branch base.
+5. **O merge é de uma pessoa.** A fábrica publica a branch do job (push ao criar a branch e depois de cada commit). Com `APPROVE` ela para e espera você: o MR só é aberto com o seu `/qubit approve <id>`. Ela nunca faz merge, nunca faz force push e nunca faz push na branch base.
 
 ---
 
@@ -92,8 +92,8 @@ Status possíveis de um job (`job.json.status`): `spec` → `building` → `gate
 | 4 | **GATES** | `factory-gates.sh` | worktree | `round-<n>/gates.md` (`GATES: PASS/FAIL`) | `FAIL` → BUILD (conta rodada) · `PASS` → REVIEW |
 | 5 | **REVIEW** | revisores em paralelo | diff + código (sem `build.md`) | `round-<n>/review-<nome>.md` (`VERDICT: PASS/CHANGES`) | DECIDIR |
 | 6 | **DECIDIR** | orquestrador | primeira linha de cada review | — | todos `PASS` → APPROVE · `CHANGES` → BUILD (ou APPROVE na última rodada) |
-| 7 | **APPROVE** | `approver` + gates finais | spec, todas as rodadas, baseline | `decision.md` (`APPROVE`/`ESCALATE`), `final-gates.md` | MR ou `needs-human` |
-| 8 | **MR** | orquestrador | branch do job, `decision.md` | MR da branch do job para a branch base (`gh`/`glab`), link em `job.json.mr`; card do Jira movido para `FACTORY_JIRA_MR_STATUS` | `mr-open`, ou `needs-human` se o MR não abrir ou houver conflito persistente com a base |
+| 7 | **APPROVE** | `approver` + gates finais | spec, todas as rodadas, baseline | `decision.md` (`APPROVE`/`ESCALATE`), `final-gates.md` | `APPROVE` → `approving` (espera você); `ESCALATE` ou gates finais `FAIL` → `needs-human` |
+| 8 | **MR** | orquestrador, **só com `/qubit approve <id>`** | branch do job, `decision.md` | MR da branch do job para a branch base (`gh`/`glab`), link em `job.json.mr`; card do Jira movido para `FACTORY_JIRA_MR_STATUS` | `mr-open`, ou `needs-human` se o MR não abrir ou houver conflito persistente com a base |
 | 9 | **APRENDER** | `learner` (só leitura) | job atual + jobs anteriores | linhas novas em `lessons.md` | fim |
 | 10 | **LIMPEZA** | `factory-cleanup.sh` (sem LLM) | jobs em `mr-open` | merge confirmado → worktree, branch local, branch remota e caches do perfil apagados | `merged`; MR ainda aberto → nada muda |
 
@@ -111,7 +111,7 @@ Status possíveis de um job (`job.json.status`): `spec` → `building` → `gate
 
 **Título do MR:** `type(<escopo>): <resumo>` em inglês, no imperativo, com o mesmo `type`. A descrição vem de `decision.md` (critérios de aceitação, rodadas e motivo) e cita o card do Jira, se houver.
 
-**Card do Jira:** comece o pedido com a chave (`/qubit ABC-123 <descrição>`) ou a URL do card. Só a chave, sem descrição, faz o orquestrador ler o card no Jira e usá-lo como descrição. Quando o MR abre (por `APPROVE` ou `/qubit approve`), o card vai para o status de `FACTORY_JIRA_MR_STATUS` (aqui `PP Code Review`), pela ferramenta do Jira (Atlassian MCP). Falha no Jira não derruba o job: o MR continua aberto e a fábrica avisa em uma linha, com as transições disponíveis.
+**Card do Jira:** comece o pedido com a chave (`/qubit ABC-123 <descrição>`) ou a URL do card. Só a chave, sem descrição, faz o orquestrador ler o card no Jira e usá-lo como descrição. Quando o MR abre (com `/qubit approve`), o card vai para o status de `FACTORY_JIRA_MR_STATUS` (aqui `PP Code Review`), pela ferramenta do Jira (Atlassian MCP). Falha no Jira não derruba o job: o MR continua aberto e a fábrica avisa em uma linha, com as transições disponíveis.
 
 **Limpeza depois do merge:** a fábrica não é avisada do merge; ela confere no `/qubit cleanup` e no começo de cada `/qubit <descrição>` e `/qubit next`. O merge é confirmado pela CLI do host (`gh`/`glab`) ou pelo `git` (a branch já está em `origin/<base>`); squash merge sem CLI fica pendente até o orquestrador confirmar pela ferramenta MCP do host. Confirmado o merge, saem o worktree, a branch local, a branch remota (se o host não apagou) e os caches do perfil fora do worktree (no `ios`, o DerivedData do worktree). A pasta `factory/jobs/<id>` fica como histórico. MR fechado sem merge não é limpo.
 
@@ -131,8 +131,8 @@ Status possíveis de um job (`job.json.status`): `spec` → `building` → `gate
 | `/qubit --refactor <descrição>` | Força refactor: sem mudar comportamento nem alterar testes existentes. |
 | `/qubit next` | Pega o primeiro `- [ ]` de `factory/backlog.md`, marca como `- [~] <job-id>` e roda. |
 | `/qubit status` | Lista os jobs: id, tipo, status, rodada, chamadas de agente e link do MR. |
-| `/qubit approve <job-id>` | Para um job em `needs-human`: é a sua aprovação para **abrir o MR**, depois de revisar. Não faz merge. |
-| `/qubit rework <job-id> <nota>` | Grava sua nota em `human-note.md`, zera a rodada e devolve ao builder. Vale para `needs-human` e para `mr-open` (os commits novos entram no mesmo MR). |
+| `/qubit approve <job-id>` | Para um job em `approving` (o approver deu `APPROVE`) ou `needs-human`: é a sua aprovação para **abrir o MR**, depois de revisar. Não faz merge. |
+| `/qubit rework <job-id> <nota>` | Grava sua nota em `human-note.md`, zera a rodada e devolve ao builder. Vale para `needs-human`, `approving` e `mr-open` (os commits novos entram no mesmo MR). |
 | `/qubit cleanup [job-id]` | Limpa os jobs cujo MR já foi mergeado (worktree, branches e caches); status `merged`. Sem `job-id`, confere todos os jobs em `mr-open`. |
 
 ### Exemplos
@@ -215,6 +215,7 @@ A fábrica é autônoma no caminho feliz. Ela **para com status `needs-human`** 
 | Situação | Onde aparece | O que fazer |
 |---|---|---|
 | **Dúvidas bloqueantes no spec** — o pedido é ambíguo ou falta decisão de produto | seção `## Dúvidas bloqueantes` de `spec.md` | Responda as dúvidas e rode `/qubit` de novo com a descrição mais completa. |
+| **`APPROVE` do approver** — todos os ACs comprovados e gates finais verdes | `decision.md` (status `approving`) | Revise o diff na branch do job (`job.json.branch`, já publicada). Se estiver bom: `/qubit approve <id>` abre o MR. Se não: `/qubit rework <id> <nota>`. Nada é aberto sem o seu comando. |
 | **`ESCALATE` do approver** — algum AC não foi comprovado, ou revisores ainda pedem mudanças na última rodada | seção `## Motivo` de `decision.md` | Revise o diff na branch do job (`job.json.branch`, já publicada). Se estiver bom: `/qubit approve <id>` abre o MR. Se não: `/qubit rework <id> <nota>`. |
 | **Gates finais falharam** depois de um `APPROVE` | `final-gates.md` | Trate como `ESCALATE`: `rework` com a correção esperada. |
 | **Revisor falhou duas vezes** (arquivo ausente ou sem `VERDICT:` válido) | `round-<n>/review-<nome>.md` | Veja o que travou o revisor; normalmente `rework` ou rodar de novo resolve. |
