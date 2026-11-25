@@ -50,9 +50,9 @@ O seu contexto precisa durar o job inteiro, com várias rodadas. Por isso:
 | `/qubit <desc>` | Novo job. Tipo inferido (feature, bug, refactor) ou forçado com `--bug` / `--refactor` / `--feature`. Card do Jira opcional (veja **Card do Jira**). Antes do INIT, faça a **varredura de limpeza**. |
 | `/qubit next` | Pega o primeiro item `- [ ]` de `factory/backlog.md`, marca `- [~] <job-id>` e roda. Antes do INIT, faça a **varredura de limpeza**. |
 | `/qubit status` | Lista jobs (id, tipo, status, rodada, chamadas de agente, link do MR). Só lê `job.json`. |
-| `/qubit approve <id>` | Só para `needs-human`: é a aprovação da pessoa para **abrir o MR** (roda o passo MR). Não faz merge. |
+| `/qubit approve <id>` | Só para `approving` (o approver deu `APPROVE`) ou `needs-human` (ex.: MR não abriu): é a aprovação da pessoa para **abrir o MR** (roda o passo MR). Nunca abre MR sem esse comando. Não faz merge. |
 | `/qubit cleanup [id]` | Limpa jobs cujo MR já foi mergeado (veja **10. LIMPEZA**). Sem `id`, varre todos os jobs em `mr-open`. |
-| `/qubit rework <id> <nota>` | Para `needs-human` ou `mr-open` (ex.: mudança pedida no review do MR): grava a nota em `human-note.md`, zera `round`, volta ao passo BUILD. Se o worktree já foi removido, recrie-o antes: `git worktree add "$WT" "$BRANCH"`. |
+| `/qubit rework <id> <nota>` | Para `needs-human`, `approving` ou `mr-open` (ex.: mudança pedida no review do MR): grava a nota em `human-note.md`, zera `round`, volta ao passo BUILD. Se o worktree já foi removido, recrie-o antes: `git worktree add "$WT" "$BRANCH"`. |
 
 ## `job.json`
 
@@ -147,9 +147,11 @@ Os revisores **não leem `build.md`**: eles verificam o diff e rodam o código p
 ### 7. APPROVE
 Spawne `approver` (`claude-opus-5-5`). Entrada: `spec.md`, todos os `round-*/`, `baseline.md`, `$PROFILE`. Saída: `decision.md`, primeira linha `APPROVE` ou `ESCALATE` (leia com `head -1`).
 Antes de aceitar `APPROVE`, rode os gates **de novo** no estado final (`> "$JOB/final-gates.md"`, só `head -1`). Se `FAIL`, trate como `ESCALATE`.
-Em `ESCALATE`, mostre ao usuário só a seção `## Motivo` (`sed -n '/^## Motivo/,$p'`).
+- `APPROVE` com gates finais `PASS`: grave `status` = `approving` e **pare**. Não abra o MR. Mostre ao usuário a linha de resumo do `decision.md` e diga: "Aprovado pelo approver. Para abrir o MR, rode `/qubit approve <id>`." O MR só nasce com esse comando.
+- `ESCALATE` (ou gates finais `FAIL`): status `needs-human`. Mostre ao usuário só a seção `## Motivo` (`sed -n '/^## Motivo/,$p'`).
 
-### 8. MR (só com `APPROVE`, ou com `/qubit approve <id>`)
+### 8. MR (só com `/qubit approve <id>`, nunca automático)
+Esta etapa roda **somente** quando a pessoa manda `/qubit approve <id>` num job em `approving` (ou `needs-human`, para retomar um MR que não abriu). Ao receber o comando, confira `job.json.status` e siga. Não entre nesta etapa logo depois do approver, mesmo com `APPROVE`.
 Você abre o MR de `$BRANCH` para `$BASE`. Você **não faz merge**, nem local nem no remoto.
 1. **Sincronize:** `git -C "$WT" fetch origin "$BASE"` e `git -C "$WT" push origin "$BRANCH"` (garante que todo commit está no remoto).
 2. **Conflito com a base:** rode `git -C "$WT" merge-tree --write-tree HEAD "origin/$BASE" > /dev/null`; código de saída diferente de 0 é conflito. Nesse caso, retome o builder para **uma** tentativa de `git merge "origin/$BASE"` dentro de `$WT` (merge, nunca rebase: a branch já está publicada e force push é bloqueado), com commit e push; depois rode os gates de novo. Se o conflito ou os gates falharem de novo: `needs-human`, sem forçar nada.
@@ -173,7 +175,7 @@ Você abre o MR de `$BRANCH` para `$BASE`. Você **não faz merge**, nem local n
 Review, CI e merge do MR acontecem no remoto e são de uma pessoa. Mudança pedida no review volta pela fábrica com `/qubit rework <id> <nota>`. Depois do merge, o lixo do job sai na LIMPEZA.
 
 ### 9. APRENDER
-Depois de `mr-open` ou `needs-human`, **não leia** os reviews você mesmo. Spawne `learner` (`claude-sonnet-5-5`, só leitura) com o caminho do job, de `factory/jobs/` e de `factory/lessons.md`. Registre a chamada em `events`; ela roda mesmo com `max_agent_calls` atingido.
+Depois de `mr-open`, `needs-human` ou `approving` (job parado aguardando a pessoa), **não leia** os reviews você mesmo. Spawne `learner` (`claude-sonnet-5-5`, só leitura) com o caminho do job, de `factory/jobs/` e de `factory/lessons.md`. Registre a chamada em `events`; ela roda mesmo com `max_agent_calls` atingido.
 - `resultado: NENHUMA`: nada a fazer.
 - `resultado: LICOES`: acrescente ao fim de `factory/lessons.md`, na raiz do repo, cada linha do relatório que começa com `- `, como veio (`printf '%s\n' '<linha>' >> factory/lessons.md`).
 
@@ -195,4 +197,4 @@ A fábrica não sabe sozinha quando o MR foi mergeado. Ela confere em dois momen
 
 ## Quando parar e perguntar ao usuário
 
-Dúvidas bloqueantes no spec, estouro de `max_agent_calls`, revisor que falha duas vezes, push que falha, conflito persistente com a base, MR que não pôde ser aberto, `ESCALATE`. Mostre: o `job-id`, o motivo e o caminho do arquivo relevante. Nunca faça merge, nunca force push, nunca faça push na branch base. Branch remota de job só é apagada pelo script de limpeza, depois do merge confirmado.
+Dúvidas bloqueantes no spec, estouro de `max_agent_calls`, revisor que falha duas vezes, push que falha, conflito persistente com a base, MR que não pôde ser aberto, `ESCALATE`, e `APPROVE` aguardando `/qubit approve` (status `approving`). Mostre: o `job-id`, o motivo e o caminho do arquivo relevante. Nunca faça merge, nunca force push, nunca faça push na branch base. Branch remota de job só é apagada pelo script de limpeza, depois do merge confirmado.

@@ -13,7 +13,7 @@ A stack vem de um **perfil** (`FACTORY_PROFILE` em `factory/config.sh`): `ios`, 
 /qubit --refactor <descrição>        # refactor: sem mudar comportamento nem testes existentes
 /qubit next                          # primeiro item não marcado de factory/backlog.md
 /qubit status
-/qubit approve <job-id>              # sua aprovação para abrir o MR de um job em needs-human (não faz merge)
+/qubit approve <job-id>              # sua aprovação para abrir o MR de um job em approving (APPROVE do approver) ou needs-human (não faz merge)
 /qubit rework <job-id> <nota>        # devolve ao builder com a sua nota
 /qubit cleanup [job-id]              # limpa jobs com MR mergeado (worktree, branches, caches)
 ```
@@ -31,7 +31,9 @@ INIT (worktree + push da branch + baseline) -> SPEC -> BUILD -> GATES --FAIL--> 
                                                  |
                                                PASS
                                                  v
-                                APPROVE -> gates de novo -> MR (mr-open) + card do Jira   |  ESCALATE -> needs-human
+                 APPROVE -> gates de novo -> approving (espera /qubit approve)   |  ESCALATE -> needs-human
+                                                 |
+                                 /qubit approve (pessoa) -> MR (mr-open) + card do Jira
                                                  |
                                    merge no remoto (pessoa)
                                                  v
@@ -42,7 +44,7 @@ INIT (worktree + push da branch + baseline) -> SPEC -> BUILD -> GATES --FAIL--> 
 
 - **Branch do job:** `<type>/<job-id>`, no padrão conventional commits: `feat/` (feature), `fix/` (bug) ou `refactor/`. Ex.: `feat/003-login-biometrico`.
 - **Push:** logo depois de criar a branch (`-u origin <branch>`) e depois de cada commit do builder. Nunca force push, nunca push na branch base.
-- **MR:** com `APPROVE` (ou `/qubit approve <job-id>`), o orquestrador abre o MR da branch do job para a branch base com `gh` (GitHub) ou `glab` (GitLab). Título `type(escopo): resumo` em inglês; descrição a partir de `decision.md`. O link fica em `job.json.mr` e o status vira `mr-open`.
+- **MR:** só com `/qubit approve <job-id>` (depois de um `APPROVE`, o job fica em `approving` esperando você). O orquestrador abre o MR da branch do job para a branch base com `gh` (GitHub) ou `glab` (GitLab). Título `type(escopo): resumo` em inglês; descrição a partir de `decision.md`. O link fica em `job.json.mr` e o status vira `mr-open`.
 - **Jira:** se o pedido trouxer a chave do card (`/qubit ABC-123 ...`), o card vai para `FACTORY_JIRA_MR_STATUS` quando o MR abre (Atlassian MCP). Falha no Jira só gera aviso.
 - **Merge:** é de uma pessoa, no remoto. A fábrica nunca faz merge na branch base.
 - **Limpeza:** `plugins/qubit/scripts/factory-cleanup.sh` confirma o merge (CLI do host ou `git`) e apaga worktree, branch local, branch remota e caches do perfil (no `ios`, o DerivedData do worktree). Roda no `/qubit cleanup` e no começo de cada job novo; o job vira `merged`.
